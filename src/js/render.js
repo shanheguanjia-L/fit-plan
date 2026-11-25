@@ -107,6 +107,15 @@ function stItem(nm){
   return '<li>'+nm+howBlock(m)+'</li>';
 }
 
+/* ---------- 熱身（依當天動作） ---------- */
+const WARM_LOWER = ['sq','lg','gl','hg','calf'], WARM_UPPER = ['hp','vp','hr','vr','rd','tr','bi'];
+function warmupHtml(ex){
+  const gs=ex.map(function(e){ return EXM[e] && EXM[e].g });
+  const lower=gs.some(function(g){ return WARM_LOWER.indexOf(g)>=0 }), upper=gs.some(function(g){ return WARM_UPPER.indexOf(g)>=0 });
+  const items=(upper?['肩部绕环','手臂绕环']:[]).concat(lower?['90/90 髋转换']:[]);
+  return '<div class="muted">热身（约 5 分钟）：'+(lower?'下肢动作多，髋要先活动开；':'')+'正式开始前，先用空手或很轻的重量，把今天的第一个动作做 1–2 组、每组约 10 次。</div>'+
+    (items.length?'<ol>'+items.map(function(n){ return stItem(n) }).join('')+'</ol>':'');
+}
 /* ---------- 訓練計劃 ---------- */
 function workoutCard(A){
   const W = workout(A); const rest = REPS[A.exp][2];
@@ -120,7 +129,7 @@ function workoutCard(A){
     if(d.cardio){
       h += '<ul class="t"><li>快走、椭圆机或骑车 30–40 分钟，强度以「能说话、不能唱歌」为准</li><li>结束后做 8–10 分钟拉伸：大腿前后侧、臀部、胸肩</li></ul>';
     } else {
-      h += '<ol>'+d.ex.map((e,j)=>exItem(e,i,j,A,d.ex)).join('')+'</ol>';
+      h += warmupHtml(d.ex)+'<ol>'+d.ex.map((e,j)=>exItem(e,i,j,A,d.ex)).join('')+'</ol>';
       if(d.focus && d.focus.length){
         h += '<div class="muted" style="margin-top:6px">重点加练（约 8 分钟，每个动作 2 组）</div><ol>'+d.focus.map(function(e){ return focusItem(e,A) }).join('')+'</ol>';
       }
@@ -129,7 +138,6 @@ function workoutCard(A){
   });
   const cardio = (A.goal==='fat'||A.goal==='shape') ? '每周另外加 2–3 次快走或其他有氧，每次 30 分钟。' : '每周加 1–2 次轻松有氧，每次 20–30 分钟即可。';
   h += '<div class="day"><h4><span>其他</span>有氧与日常</h4><ul class="t"><li>'+cardio+'</li><li>日常步数争取 7000–9000 步。</li></ul></div>';
-  h += '<div class="day"><h4><span>热身</span>每次训练前 5 分钟</h4><ol>'+['肩部绕环','手臂绕环'].map(function(n){ return stItem(n) }).join('')+'</ol></div>';
   h += '<div class="day"><h4><span>拉伸</span>训练后 5–8 分钟</h4><ol>'+['儿童式','站姿小腿拉伸','三头肌拉伸'].map(function(n){ return stItem(n) }).join('')+'</ol></div>';
   h += '<div class="day"><h4><span>进阶</span>怎么加重量</h4><ul class="t"><li>热身 5–8 分钟：关节活动加上第一个动作的空杆或轻重量。</li><li>某个动作连续两次、每组都做到次数上限，下次就加一点重量（哑铃加 1–2 kg，或换更强的弹力带）。</li><li>徒手动作做不到加重时，改成放慢下放速度（3 秒）或增加每组次数。</li></ul></div>';
   const wantF=(A.focus||[]).filter(function(x){ return FOCUS_ROWS[x] });
@@ -145,6 +153,8 @@ function workoutCard(A){
   return h+'</div>';
 }
 
+/* 每天菜單食物裡的鐵、鈣大約量（USDA 每 100 克數據 × 克數；不含烹調流失與吸收率，也不含沒列進菜單的食物） */
+function dayMicro(d){ let fe=0,ca=0; d.meals.forEach(function(m){ m.items.forEach(function(it){ const f=FM[it.n]; fe+=f.fe*it.g/100; ca+=f.ca*it.g/100 }) }); return {fe:fe,ca:ca} }
 /* ---------- 飲食計劃 ---------- */
 function menuCard(A,C){
   if(A.nonum) return menuCardNoNum(A,C);
@@ -156,7 +166,7 @@ function menuCard(A,C){
       return '<div class="meal"><b>'+m.name+'</b> <small>约 '+Math.round(m.k)+' kcal · 蛋白质约 '+Math.round(m.p)+' g</small><br>'+
         m.items.map(function(it){ return qty(it.n,it.g) }).join('、')+'<br><small>'+m.hint+'</small></div>';
     }).join('')+
-    '<div class="muted">全天：蛋白质 '+Math.round(d.total.p)+' g · 碳水 '+Math.round(d.total.c)+' g · 脂肪 '+Math.round(d.total.f)+' g</div></details>';
+    '<div class="muted">全天：蛋白质 '+Math.round(d.total.p)+' g · 碳水 '+Math.round(d.total.c)+' g · 脂肪 '+Math.round(d.total.f)+' g</div><div class="muted">食物里大约含：铁 '+dayMicro(d).fe.toFixed(1)+' mg · 钙 '+Math.round(dayMicro(d).ca)+' mg</div></details>';
   }).join('');
   // 蛋白質平均吃不到目標的 85% 時，如實說明（常見於蛋奶素 + 減脂：植物性蛋白每克蛋白質的熱量高，在低熱量下很難吃夠）
   const avgP=M.reduce(function(s,d){ return s+d.total.p },0)/M.length;
@@ -166,6 +176,7 @@ function menuCard(A,C){
   if(A.eat!=='cook'){
     h += '<div class="day"><h4><span>外食</span>怎么点</h4><ul class="t"><li>选清蒸、水煮、炖、烤，少选油炸、勾芡和浓汤。</li><li>主食点小份，酱汁分开放。</li><li>麻辣烫选清汤，多放蔬菜和肉类，少放芝麻酱。</li><li>便利店：茶叶蛋、无糖豆浆、即食鸡胸肉、玉米、沙拉都是可以的。</li></ul></div>';
   }
+  h += '<div class="muted" style="margin-top:8px">铁、钙只是菜单食物里的大约含量，没算吸收率，也不代表够不够用。如果经常很累、头晕，或月经量很多，请去医院验血，不要自己买铁剂吃。</div>';
   h += '<div class="muted" style="margin-top:8px">营养数据来自美国农业部 FoodData Central，克数为估算。</div>';
   return h+'</div>';
 }
@@ -204,7 +215,7 @@ function foodLibCard(A){
     FOODS.filter(function(f){ return f.c===c }).forEach(function(f){
       const bad = !allowed(f,A);
       h += '<div class="meal"'+(bad?' style="opacity:.5"':'')+'><b>'+f.n+'</b> '+(f.t?'<small style="color:var(--warn)">'+FOOD_TAG[f.t]+(bad?'（你的忌口，不推荐）':'')+'</small>':'')+
-        (A.nonum?'':'<br><small>热量 '+f.k+' kcal · 蛋白质 '+f.p.toFixed(1)+' g · 碳水 '+f.cb.toFixed(1)+' g · 脂肪 '+f.f.toFixed(1)+' g</small>')+
+        (A.nonum?'':'<br><small>热量 '+f.k+' kcal · 蛋白质 '+f.p.toFixed(1)+' g · 碳水 '+f.cb.toFixed(1)+' g · 脂肪 '+f.f.toFixed(1)+' g<br>铁 '+f.fe+' mg · 钙 '+f.ca+' mg</small>')+
         (f.us&&!A.nonum?'<br><small>份量：'+f.us+'</small>':'')+(f.ck?'<br><small>吃法：'+f.ck+'</small>':'')+'</div>';
     });
     h += '</details>';

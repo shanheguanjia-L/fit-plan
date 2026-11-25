@@ -44,7 +44,10 @@ function loadOriginal(file){
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   if(!m) throw new Error('原版檔案裡找不到 <script>');
   const ctx = makeContext();
-  vm.runInContext(m[1], ctx, {filename:'original'});
+  // 刻意改動的基準（2026-11-25）：蛋白質係數 1.8→1.6 g/kg（減脂、增肌）。比對基準跟著改，其餘仍是原版。
+  const src = m[1].replace("? 1.8 : 1.5;", "? 1.6 : 1.5;");
+  if(src === m[1]) throw new Error('原版裡找不到蛋白質係數那一行，基準補丁失效');
+  vm.runInContext(src, ctx, {filename:'original'});
   return ctx;
 }
 // 正式版 index.html：依序執行所有內嵌 <script>（含最前面的錯誤提示條腳本）

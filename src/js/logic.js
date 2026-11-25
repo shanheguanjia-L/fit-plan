@@ -54,7 +54,7 @@ function calc(A){
     else if(A.goal==='muscle'){ kcal=tdee*1.05; mode='轻微盈余' }
   }
   kcal = Math.round(kcal/10)*10;
-  const pPerKg = (A.goal==='fat'||A.goal==='muscle') ? 1.8 : 1.5;
+  const pPerKg = (A.goal==='fat'||A.goal==='muscle') ? 1.6 : 1.5;   // 原 1.8；多篇統合分析顯示超過約 1.6 g/kg 後增肌效果不再增加（Morton 2018），也比較吃得到
   const p = Math.round(w*pPerKg);
   const f = Math.round(kcal*0.27/9);
   const c = Math.max(100, Math.round((kcal-4*p-9*f)/4));

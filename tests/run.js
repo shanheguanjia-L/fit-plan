@@ -94,8 +94,10 @@ test('食物：48 種（原 47 + 羊腿肉）、名稱與 FDC 編號唯一、飲
   assert.strictEqual(FOODS.length,48);
   const of=JSON.parse(JSON.stringify(vm.runInContext('FOODS',L.loadOriginal(ORIG_FILE))));
   assert.strictEqual(of.length,47);
-  assert.deepStrictEqual(J(FOODS.filter(f=>f.n!=='羊腿肉（瘦、烤熟）')),of,'原 47 種被改動');
-  const lamb=FM['羊腿肉（瘦、烤熟）']; assert.deepStrictEqual(J(lamb),{c:'肉禽',n:'羊腿肉（瘦、烤熟）',k:191,p:28.3,cb:0,f:7.7,t:'m',u:0,us:'',ck:'烤、炖、少油快炒',fdc:174314});
+  const noMicro=f=>{ const o=Object.assign({},f); delete o.fe; delete o.ca; return o };   // 鐵、鈣是 2026-11-25 新增欄位，其餘欄位仍須與原版相同
+  assert.deepStrictEqual(J(FOODS.filter(f=>f.n!=='羊腿肉（瘦、烤熟）')).map(noMicro),of,'原 47 種被改動');
+  FOODS.forEach(f=>{ assert.ok(typeof f.fe==='number' && f.fe>=0 && f.fe<15,f.n+' 的鐵不合理：'+f.fe); assert.ok(typeof f.ca==='number' && f.ca>=0 && f.ca<1000,f.n+' 的鈣不合理：'+f.ca) });
+  const lamb=FM['羊腿肉（瘦、烤熟）']; assert.deepStrictEqual(J(lamb),{c:'肉禽',n:'羊腿肉（瘦、烤熟）',k:191,p:28.3,cb:0,f:7.7,t:'m',u:0,us:'',ck:'烤、炖、少油快炒',fdc:174314,fe:2.12,ca:8});
   const fdc={}; FOODS.forEach(f=>{
     assert.ok(Number.isInteger(f.fdc) && f.fdc>0, f.n+' 缺 FDC 編號'); assert.ok(!fdc[f.fdc], '重複 FDC '+f.fdc); fdc[f.fdc]=1;
     assert.ok(['','m','s','e','d'].indexOf(f.t)>=0, f.n);
@@ -112,7 +114,7 @@ console.log('calc');
 test('一般減脂：55kg/160cm/30 歲/每週 3 天', ()=>{
   const C=calc(base());
   assert.strictEqual(C.bmr,1239); assert.strictEqual(C.tdee,1800); assert.strictEqual(C.kcal,1440);
-  assert.strictEqual(C.mode,'温和减脂'); assert.deepStrictEqual([C.p,C.f,C.c],[99,43,164]);
+  assert.strictEqual(C.mode,'温和减脂'); assert.deepStrictEqual([C.p,C.f,C.c],[88,43,175]);
   assert.strictEqual(C.flagged,false); assert.strictEqual(C.low,false);
   assert.ok(Math.abs(C.weekly-(-0.3241))<1e-3);
 });
@@ -267,7 +269,7 @@ test('所有含中文的字串常數：原版與重構版集合完全相同（�
   // ③ 設計改版拿掉的聊天頭像文字「练」；個性化改版把「好的，我按你的情况算一下……」換成帶出她答案的一句話；腰圍改成「選填」，不再有「跳过」按鈕
   const wb=cjkWords(b);   // 新版所有中文詞；原版片段若只是切法不同（詞都還在）就算保留
   const oldFlow=origCode.slice(origCode.indexOf('async function flow('),origCode.indexOf('function start('));   // ④ 舊問卷流程裡的問題與選項（已由 questions.js 的新問法取代）
-  onlyOrig.forEach(s=>assert.ok(oldFlow.indexOf(s)>=0 || s==='练' || s==='跳过' || s.indexOf('你选了重点部位，但在你的器材和不适部位限制下')>=0 || s==='好的，我按你的情况算一下……' || dead.indexOf(s)>=0 || boot.indexOf("'"+s+"'")>=0 || (s.match(/[\u4e00-\u9fff]+/g)||[]).every(w=>wb.has(w)), '原版文字不見了：'+s));
+  onlyOrig.forEach(s=>assert.ok(oldFlow.indexOf(s)>=0 || s==='练' || s==='跳过' || s.indexOf('每次训练前 5 分钟')>=0 || s.indexOf('你选了重点部位，但在你的器材和不适部位限制下')>=0 || s==='好的，我按你的情况算一下……' || dead.indexOf(s)>=0 || boot.indexOf("'"+s+"'")>=0 || (s.match(/[\u4e00-\u9fff]+/g)||[]).every(w=>wb.has(w)), '原版文字不見了：'+s));
   assert.ok(boot.indexOf("'页面出错：'")>=0);
 });
 test('頁面骨架：除頁首（改版）外，#err、#chat、noscript 與原版逐字相同（dev.html 與 index.html）', ()=>{
@@ -460,6 +462,50 @@ test('菜單校準：被校準的食物（主食、蛋白質食物）克數 ≥ 
     M.forEach(d=>d.meals.forEach(m=>m.items.forEach(it=>{ if(it.st||it.pr) assert.ok(it.g>=5 && it.g%5===0,it.n+' '+it.g) })));   // 主食與蛋白質食物的克數會被校準：5 的倍數（水果、坚果、油是固定份量）
     if(diet[0]==='none') M.forEach(d=>assert.ok(d.total.p>=C.p*0.5,'一般飲食蛋白質過低'));
   })));
+});
+
+
+console.log('蛋白質係數、依當天動作熱身、食物鐵鈣');
+test('蛋白質：減脂、增肌 1.6 g/kg，其餘 1.5 g/kg（四捨五入）', ()=>{
+  [50,55,63,80].forEach(w=>{
+    assert.strictEqual(calc(base({weight:w,goal:'fat'})).p,Math.round(w*1.6));
+    assert.strictEqual(calc(base({weight:w,goal:'muscle'})).p,Math.round(w*1.6));
+    assert.strictEqual(calc(base({weight:w,goal:'shape'})).p,Math.round(w*1.5));
+  });
+});
+test('熱身：每個訓練日都有；有下肢動作的日子有髖活動，有上肢動作的日子有肩、手臂繞環；有氧日不顯示', ()=>{
+  const wu=G('warmupHtml');
+  let lowerDays=0, upperDays=0, plain=0;
+  ['body','home','gym'].forEach(place=>[2,3,4,5].forEach(days=>{
+    const A=base({place,days}); const W=workout(A);
+    const html=G('workoutCard')(A);
+    W.filter(d=>!d.cardio).forEach(d=>{
+      const h=wu(d.ex), gs=d.ex.map(e=>EXM[e].g);
+      const lo=gs.some(g=>['sq','lg','gl','hg','calf'].indexOf(g)>=0), up=gs.some(g=>['hp','vp','hr','vr','rd','tr','bi'].indexOf(g)>=0);
+      assert.ok(h.indexOf('第一个动作做 1–2 组')>=0,'沒有輕量第一個動作說明');
+      assert.strictEqual(h.indexOf('90/90 髋转换')>=0, lo);
+      assert.strictEqual(h.indexOf('肩部绕环')>=0, up);
+      assert.strictEqual(h.indexOf('手臂绕环')>=0, up);
+      if(lo) lowerDays++; if(up) upperDays++; if(!lo && !up) plain++;
+    });
+    assert.strictEqual((html.match(/热身（约 5 分钟）/g)||[]).length, W.filter(d=>!d.cardio).length);
+    assert.ok(html.indexOf('每次训练前 5 分钟')<0,'舊的全域熱身區塊還在');
+  }));
+  assert.ok(lowerDays>0 && upperDays>0,'應該兩種日子都有：'+lowerDays+'/'+upperDays);
+});
+test('鐵、鈣：菜單每天都顯示，數字就是食物含量 × 克數；不看數字模式不顯示；食物庫每種都顯示', ()=>{
+  const mc=G('menuCard'), fl=G('foodLibCard');
+  [['none'],['veg'],['lactose']].forEach(diet=>{
+    const A=base({diet}), C=calc(A), M=menu(A,C), html=mc(A,C);
+    assert.strictEqual((html.match(/食物里大约含：铁/g)||[]).length,7);
+    M.forEach(d=>{ let fe=0,ca=0; d.meals.forEach(m=>m.items.forEach(it=>{ fe+=FM[it.n].fe*it.g/100; ca+=FM[it.n].ca*it.g/100 }));
+      assert.ok(html.indexOf('铁 '+fe.toFixed(1)+' mg · 钙 '+Math.round(ca)+' mg')>=0); });
+    assert.ok(html.indexOf('请去医院验血')>=0);
+    assert.ok(mc(base({diet,nonum:true}),calc(base({diet,nonum:true}))).indexOf('钙 ')<0,'不看數字模式不該顯示鐵鈣');
+  });
+  const lib=fl(base());
+  FOODS.forEach(f=>assert.ok(lib.indexOf('铁 '+f.fe+' mg · 钙 '+f.ca+' mg')>=0,f.n));
+  assert.ok(fl(base({nonum:true})).indexOf('铁 ')<0);
 });
 
 console.log('重點部位細分');
