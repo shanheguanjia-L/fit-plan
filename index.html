@@ -8,12 +8,11 @@
 :root{--bg:#f3f1ec;--ink:#24302a;--sub:#6b7770;--acc:#3f8a68;--acc2:#e8f3ed;--line:#e1ded6;--warn:#b4531f;--warnbg:#fdf0e6}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.55}
-#app{display:flex;flex-direction:column;height:100vh;height:100dvh;max-width:560px;margin:0 auto;background:var(--bg);overflow:hidden}
-#chat{min-height:0}
-header{padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex:none}
+#app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg)}
+header{padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
 header .av{width:36px;height:36px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:600}
 header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12px}
-#chat{flex:1;overflow-y:auto;padding:14px 12px 8px;scroll-behavior:smooth}
+#chat{padding:14px 12px 40px}
 .row{display:flex;margin:10px 0;gap:8px;align-items:flex-start;animation:in .25s ease}
 .row.user{justify-content:flex-end}
 @keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -25,7 +24,9 @@ header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12
 .typing span{display:inline-block;width:6px;height:6px;margin:0 2px;background:#b5bdb8;border-radius:50%;animation:b 1s infinite}
 .typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
 @keyframes b{50%{transform:translateY(-4px);background:var(--acc)}}
-#tray{flex:none;background:#fff;border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));min-height:64px}
+#tray{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+#tray:empty{display:none}
+#err{display:none;background:#b00020;color:#fff;padding:8px 12px;font-size:13px;word-break:break-all}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1.5px solid var(--acc);color:var(--acc);background:#fff;border-radius:22px;padding:9px 16px;font-size:15px;cursor:pointer;font-family:inherit}
 .chip:active{background:var(--acc2)}
@@ -58,8 +59,9 @@ ul.t{margin:6px 0;padding-left:20px}ul.t li{margin:4px 0}
 <body>
 <div id="app">
   <header><div class="av">练</div><div><b>健身小助手</b><small>回答几个问题，生成你的专属计划</small></div></header>
-  <div id="chat"></div>
-  <div id="tray"></div>
+  <div id="err"></div>
+  <div id="chat"><div id="tray"></div></div>
+  <noscript><p style="padding:16px">需要开启 JavaScript 才能使用。</p></noscript>
 </div>
 <script>
 const $ = s => document.querySelector(s);
@@ -69,12 +71,12 @@ let A = {};
 let runId = 0;
 
 function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e}
-function toBottom(){chat.scrollTop = chat.scrollHeight}
+function toBottom(){ setTimeout(()=>{ const h=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight); window.scrollTo(0,h); },30) }
 function add(who, html, wide){
   const row = el('div','row '+who);
   if(who==='bot') row.appendChild(el('div','av2','练'));
   row.appendChild(el('div','bub'+(wide?' wide':''), html));
-  chat.appendChild(row); toBottom(); return row;
+  chat.insertBefore(row, tray); toBottom(); return row;
 }
 async function say(html, wide){
   const t = add('bot','<span class="typing"><span></span><span></span><span></span></span>');
@@ -93,7 +95,7 @@ function pick(q, opts){
       b.onclick = ()=>{ add('user',o.label); clearTray(); res(o.value) };
       box.appendChild(b);
     });
-    tray.appendChild(box);
+    tray.appendChild(box); toBottom();
   });
 }
 // 多选；exclusive 表示与其他互斥的选项（如“没有”）
@@ -119,7 +121,7 @@ function multi(q, opts, exclusive){
       const labels = opts.filter(o=>sel.has(o.value)).map(o=>o.label).join('、');
       add('user',labels); clearTray(); res([...sel]);
     };
-    box.appendChild(ok); tray.appendChild(box);
+    box.appendChild(ok); tray.appendChild(box); toBottom();
   });
 }
 // 数字输入
@@ -132,7 +134,7 @@ function num(q, o){
     const ok = el('button','chip go','确定');
     row.append(inp,unit,ok); wrap.appendChild(row);
     if(o.skip){ const s=el('button','chip ghost','跳过'); s.style.marginTop='8px'; s.onclick=()=>{add('user','跳过');clearTray();res(null)}; wrap.appendChild(s); }
-    tray.appendChild(wrap); setTimeout(()=>inp.focus(),50);
+    tray.appendChild(wrap); toBottom();
     const submit = async ()=>{
       const v = parseFloat(inp.value);
       if(!(v>=o.min && v<=o.max)){ inp.value=''; inp.placeholder='请输入 '+o.min+'–'+o.max; inp.focus(); return }
@@ -347,7 +349,7 @@ async function showResult(my){
   }
 }
 async function flow(my){
-  chat.innerHTML=''; clearTray(); A={};
+  chat.querySelectorAll('.row').forEach(r=>r.remove()); clearTray(); A={};
   let saved=null; try{saved=JSON.parse(localStorage.getItem('fit_A')||'null')}catch(e){}
   await say('你好呀，我是健身小助手。回答几个小问题，我就能按你的身体情况，排出训练和饮食计划。');
   if(saved){
@@ -374,15 +376,7 @@ async function flow(my){
   await showResult(my);
 }
 function start(){ runId++; flow(runId) }
-// 老版本微信内置浏览器不认 dvh：用脚本按实际可见高度撑满，保证底部输入区可见
-function fitHeight(){
-  const h = window.innerHeight;
-  if(h>0){ $('#app').style.height = h+'px' }
-  toBottom();
-}
-window.addEventListener('resize', fitHeight);
-window.addEventListener('orientationchange', ()=>setTimeout(fitHeight,200));
-fitHeight();
+window.addEventListener('error',e=>{ const b=document.getElementById('err'); b.style.display='block'; b.textContent='页面出错：'+(e.message||'未知')+' ('+(e.lineno||'?')+')'; });
 start();
 </script>
 </body>
