@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>我的专属健身计划</title>
+<style>
+:root{--bg:#f3f1ec;--ink:#24302a;--sub:#6b7770;--acc:#3f8a68;--acc2:#e8f3ed;--line:#e1ded6;--warn:#b4531f;--warnbg:#fdf0e6}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.55}
+#app{display:flex;flex-direction:column;height:100dvh;max-width:560px;margin:0 auto;background:var(--bg)}
+header{padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;flex:none}
+header .av{width:36px;height:36px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:600}
+header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12px}
+#chat{flex:1;overflow-y:auto;padding:14px 12px 8px;scroll-behavior:smooth}
+.row{display:flex;margin:10px 0;gap:8px;align-items:flex-start;animation:in .25s ease}
+.row.user{justify-content:flex-end}
+@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.av2{width:32px;height:32px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:13px;flex:none}
+.bub{background:#fff;border-radius:4px 14px 14px 14px;padding:10px 13px;max-width:82%;box-shadow:0 1px 1px rgba(0,0,0,.04);word-break:break-word}
+.user .bub{background:var(--acc);color:#fff;border-radius:14px 4px 14px 14px}
+.bub.wide{max-width:100%;width:100%}
+.row.bot:has(.wide) .av2{display:none}
+.typing span{display:inline-block;width:6px;height:6px;margin:0 2px;background:#b5bdb8;border-radius:50%;animation:b 1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes b{50%{transform:translateY(-4px);background:var(--acc)}}
+#tray{flex:none;background:#fff;border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom));min-height:64px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1.5px solid var(--acc);color:var(--acc);background:#fff;border-radius:22px;padding:9px 16px;font-size:15px;cursor:pointer;font-family:inherit}
+.chip:active{background:var(--acc2)}
+.chip.on{background:var(--acc);color:#fff}
+.chip.go{background:var(--acc);color:#fff;font-weight:600}
+.chip.ghost{border-color:var(--line);color:var(--sub)}
+.numrow{display:flex;gap:8px;align-items:center}
+.numrow input{flex:1;font-size:20px;padding:9px 12px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;min-width:0}
+.numrow input:focus{outline:none;border-color:var(--acc)}
+.numrow .unit{color:var(--sub)}
+.card h3{margin:0 0 6px;font-size:16px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0}
+.kpi{background:var(--acc2);border-radius:10px;padding:8px 10px}
+.kpi small{color:var(--sub);display:block;font-size:12px}.kpi b{font-size:19px}
+.kpi.big{grid-column:1/-1}
+.warn{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:9px 11px;margin:8px 0;font-size:14px}
+.day{border-top:1px dashed var(--line);padding:9px 0}.day:first-of-type{border-top:0}
+.day h4{margin:0 0 4px;font-size:15px}.day h4 span{color:var(--acc);margin-right:6px}
+.day ol{margin:0;padding-left:20px}.day li{margin:2px 0}.day li i{color:var(--sub);font-style:normal;font-size:13px}
+.meal{padding:5px 0}.meal b{color:var(--acc)}.meal small{color:var(--sub)}
+.muted{color:var(--sub);font-size:13px}
+ul.t{margin:6px 0;padding-left:20px}ul.t li{margin:4px 0}
+.dd{border-top:1px solid var(--line);padding:8px 0}
+.dd summary{font-weight:600;cursor:pointer;list-style:none;padding:2px 0}
+.dd summary::after{content:"＋";float:right;color:var(--acc)}
+.dd[open] summary::after{content:"－"}
+.dd summary::-webkit-details-marker{display:none}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><div class="av">练</div><div><b>健身小助手</b><small>回答几个问题，生成你的专属计划</small></div></header>
+  <div id="chat"></div>
+  <div id="tray"></div>
+</div>
+<script>
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), tray = $('#tray');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+let A = {};
+let runId = 0;
+
+function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e}
+function toBottom(){chat.scrollTop = chat.scrollHeight}
+function add(who, html, wide){
+  const row = el('div','row '+who);
+  if(who==='bot') row.appendChild(el('div','av2','练'));
+  row.appendChild(el('div','bub'+(wide?' wide':''), html));
+  chat.appendChild(row); toBottom(); return row;
+}
+async function say(html, wide){
+  const t = add('bot','<span class="typing"><span></span><span></span><span></span></span>');
+  await sleep(wide?500:350+Math.min(html.length*9,800));
+  t.remove(); add('bot',html,wide);
+}
+function clearTray(){tray.innerHTML=''}
+
+// 单选
+function pick(q, opts){
+  return new Promise(async res=>{
+    if(q) await say(q);
+    clearTray(); const box = el('div','chips');
+    opts.forEach(o=>{
+      const b = el('button','chip'+(o.cls?' '+o.cls:''), o.label);
+      b.onclick = ()=>{ add('user',o.label); clearTray(); res(o.value) };
+      box.appendChild(b);
+    });
+    tray.appendChild(box);
+  });
+}
+// 多选；exclusive 表示与其他互斥的选项（如“没有”）
+function multi(q, opts, exclusive){
+  return new Promise(async res=>{
+    await say(q); clearTray();
+    const box = el('div','chips'); const sel = new Set();
+    const btns = opts.map(o=>{
+      const b = el('button','chip',o.label);
+      b.onclick = ()=>{
+        if(sel.has(o.value)){sel.delete(o.value)}
+        else{
+          if(o.value===exclusive){sel.clear()} else {sel.delete(exclusive)}
+          sel.add(o.value);
+        }
+        btns.forEach((x,i)=>x.classList.toggle('on', sel.has(opts[i].value)));
+      };
+      box.appendChild(b); return b;
+    });
+    const ok = el('button','chip go','确定');
+    ok.onclick = ()=>{
+      if(!sel.size){ sel.add(exclusive) }
+      const labels = opts.filter(o=>sel.has(o.value)).map(o=>o.label).join('、');
+      add('user',labels); clearTray(); res([...sel]);
+    };
+    box.appendChild(ok); tray.appendChild(box);
+  });
+}
+// 数字输入
+function num(q, o){
+  return new Promise(async res=>{
+    await say(q); clearTray();
+    const wrap = el('div'); const row = el('div','numrow');
+    const inp = el('input'); inp.type='number'; inp.inputMode='decimal'; inp.placeholder=o.ph||''; inp.min=o.min; inp.max=o.max; inp.step='any';
+    const unit = el('span','unit',o.unit);
+    const ok = el('button','chip go','确定');
+    row.append(inp,unit,ok); wrap.appendChild(row);
+    if(o.skip){ const s=el('button','chip ghost','跳过'); s.style.marginTop='8px'; s.onclick=()=>{add('user','跳过');clearTray();res(null)}; wrap.appendChild(s); }
+    tray.appendChild(wrap); setTimeout(()=>inp.focus(),50);
+    const submit = async ()=>{
+      const v = parseFloat(inp.value);
+      if(!(v>=o.min && v<=o.max)){ inp.value=''; inp.placeholder='请输入 '+o.min+'–'+o.max; inp.focus(); return }
+      add('user', v+' '+o.unit); clearTray(); res(v);
+    };
+    ok.onclick = submit; inp.onkeydown = e=>{ if(e.key==='Enter') submit() };
+  });
+}
+
+/* ================= 计算 ================= */
+const GOAL = {fat:'减脂',muscle:'增肌塑形',shape:'改善体态、紧致线条',keep:'保持健康'};
+function calc(A){
+  const w=A.weight,h=A.height,a=A.age;
+  const bmr = 10*w + 6.25*h - 5*a - 161;            // Mifflin-St Jeor（女）
+  const af = {2:1.35,3:1.45,4:1.55,5:1.6}[A.days];
+  const tdee = bmr*af;
+  const bmi = w/Math.pow(h/100,2);
+  const flagged = A.health.some(x=>x!=='none') || a<18;
+  const low = bmi<18.5;
+  let kcal = tdee, mode='维持';
+  if(!flagged){
+    if(A.goal==='fat' && !low){ kcal=Math.max(tdee*0.8,bmr,1200); mode='温和减脂' }
+    else if(A.goal==='shape' && !low){ kcal=tdee*0.95; mode='轻微热量缺口' }
+    else if(A.goal==='muscle'){ kcal=tdee*1.05; mode='轻微盈余' }
+  }
+  kcal = Math.round(kcal/10)*10;
+  const pPerKg = (A.goal==='fat'||A.goal==='muscle') ? 1.8 : 1.5;
+  const p = Math.round(w*pPerKg);
+  const f = Math.round(kcal*0.27/9);
+  const c = Math.max(100, Math.round((kcal-4*p-9*f)/4));
+  const weekly = (kcal-tdee)*7/7700;                  // 约值
+  return {bmr:Math.round(bmr),tdee:Math.round(tdee/10)*10,bmi,flagged,low,kcal,mode,p,f,c,weekly};
+}
+
+/* ================= 训练 ================= */
+const SAFE = ['臀桥','鸟狗式','死虫','平板支撑','侧平板支撑','蚌式开合'];
+const LIB = {
+ gym:{
+  A:[['高脚杯深蹲','k'],['哑铃卧推','s'],['坐姿划船',''],['臀推',''],['哑铃推肩','s'],['平板支撑','']],
+  B:[['罗马尼亚硬拉','b'],['高位下拉',''],['腿举','k'],['胸部推举机','s'],['俯卧腿弯举',''],['死虫','']],
+  C:[['哑铃反向箭步蹲','k'],['哑铃单臂划船','b'],['臀推',''],['哑铃侧平举','s'],['高位下拉',''],['鸟狗式','']],
+  lower:[['腿举','k'],['罗马尼亚硬拉','b'],['臀推',''],['俯卧腿弯举',''],['哑铃保加利亚分腿蹲','k'],['站姿提踵','']],
+  upper:[['高位下拉',''],['哑铃卧推','s'],['坐姿划船',''],['哑铃推肩','s'],['绳索面拉',''],['哑铃弯举','']]
+ },
+ home:{
+  A:[['哑铃高脚杯深蹲','k'],['哑铃俯身划船','b'],['臀桥',''],['哑铃地板卧推','s'],['弹力带面拉',''],['平板支撑','']],
+  B:[['哑铃罗马尼亚硬拉','b'],['跪姿俯卧撑','s'],['哑铃单臂划船（扶椅）','b'],['负重臀桥',''],['哑铃肩推','s'],['死虫','']],
+  C:[['哑铃反向箭步蹲','k'],['弹力带坐姿划船',''],['单腿臀桥',''],['哑铃侧平举','s'],['鸟狗式',''],['侧平板支撑','']],
+  lower:[['哑铃深蹲','k'],['哑铃罗马尼亚硬拉','b'],['负重臀桥',''],['哑铃保加利亚分腿蹲','k'],['弹力带蚌式开合',''],['站姿提踵','']],
+  upper:[['哑铃单臂划船（扶椅）','b'],['跪姿俯卧撑','s'],['哑铃肩推','s'],['弹力带面拉',''],['哑铃弯举',''],['哑铃臂屈伸','s']]
+ },
+ body:{
+  A:[['徒手深蹲','k'],['跪姿俯卧撑','s'],['臀桥',''],['超人式',''],['平板支撑',''],['死虫','']],
+  B:[['反向箭步蹲','k'],['上斜俯卧撑（手扶椅子）','s'],['单腿臀桥',''],['俯卧W字',''],['鸟狗式',''],['侧平板支撑','']],
+  C:[['相扑深蹲','k'],['臀桥',''],['蚌式开合',''],['俯卧W字',''],['死虫',''],['平板支撑','']],
+  lower:[['徒手深蹲','k'],['单腿臀桥',''],['反向箭步蹲','k'],['蚌式开合',''],['站姿提踵',''],['靠墙静蹲','k']],
+  upper:[['跪姿俯卧撑','s'],['上斜俯卧撑（手扶椅子）','s'],['超人式',''],['俯卧W字',''],['平板支撑',''],['侧平板支撑','']]
+ }
+};
+const SCHED = {
+ 2:[['A','全身 A'],['B','全身 B']],
+ 3:[['A','全身 A'],['B','全身 B'],['C','全身 C']],
+ 4:[['lower','下肢与臀'],['upper','上肢与背'],['C','全身 C'],['A','全身 A']],
+ 5:[['lower','下肢与臀'],['upper','上肢与背'],['C','全身 C'],['B','全身 B'],['cardio','有氧与拉伸']]
+};
+const WK = {2:['周二','周五'],3:['周一','周三','周五'],4:['周一','周二','周四','周六'],5:['周一','周二','周四','周五','周六']};
+const TIMED = ['平板支撑','侧平板支撑','靠墙静蹲'];
+const REPS = {new:['2','12–15','60–90 秒'],some:['3','10–15','60–90 秒'],reg:['3–4','8–12','90 秒']};
+function workout(A){
+  const n = {30:4,45:5,60:6}[A.mins];
+  const lib = LIB[A.place];
+  return SCHED[A.days].map(([key,title],i)=>{
+    const day = WK[A.days][i];
+    if(key==='cardio') return {day,title,cardio:true};
+    let list = lib[key].filter(([nm,t])=>!t || !A.injury.includes(t)).map(x=>x[0]);
+    for(const s of SAFE){ if(list.length>=n) break; if(!list.includes(s)) list.push(s) }
+    return {day,title,ex:list.slice(0,n)};
+  });
+}
+function exLine(nm,A){
+  const [sets,reps] = REPS[A.exp];
+  if(TIMED.some(t=>nm.startsWith(t))) return sets.split('–')[0]+' 组 × 20–40 秒';
+  if(nm.startsWith('站姿提踵')) return sets+' 组 × 15–20 次';
+  if(/死虫|鸟狗式|超人式|俯卧W字|蚌式/.test(nm)) return sets+' 组 × 每侧/每次 8–12 次';
+  return sets+' 组 × '+reps+' 次';
+}
+
+/* ================= 饮食 ================= */
+const PROT = {
+ omni:[['鸡胸肉（香煎或水煮）',0],['虾仁（清炒）',1],['瘦牛肉（少油快炒）',0],['清蒸鱼',1],['番茄炒蛋',0],['家常豆腐',0],['去皮鸡腿肉',0]],
+ veg:[['番茄炒蛋',0],['家常豆腐',0],['香干炒时蔬',0],['毛豆炒蛋',0],['菌菇豆腐煲',0],['蒸蛋羹',0],['豆腐皮拌菜',0]]
+};
+const CARB = ['杂粮饭','糙米饭','蒸红薯','玉米','荞麦面','蒸土豆','燕麦饭'];
+const VEG = ['西兰花','清炒青菜','凉拌黄瓜','炒菠菜','番茄','香菇小油菜','清炒生菜'];
+const BRK = [
+ {t:'水煮蛋 + 全麦面包 + 无糖豆浆',d:0},{t:'燕麦 + 牛奶 + 蓝莓或香蕉',d:1},{t:'玉米 + 水煮蛋 + 黄瓜',d:0},
+ {t:'蒸红薯 + 水煮蛋 + 无糖酸奶',d:1},{t:'杂粮粥 + 蒸蛋 + 凉拌青菜',d:0},{t:'全麦三明治（蛋 + 生菜）+ 无糖豆浆',d:0},{t:'豆浆燕麦 + 水煮蛋 + 苹果',d:0}
+];
+const SNK = [
+ {t:'无糖酸奶 + 一小把坚果',d:1},{t:'苹果或橙子 + 茶叶蛋',d:0},{t:'无糖豆浆 + 全麦饼干两片',d:0},
+ {t:'香蕉 + 一小把杏仁',d:0},{t:'即食玉米 + 无糖豆浆',d:0},{t:'茶叶蛋 + 圣女果',d:0},{t:'无糖酸奶 + 莓类水果',d:1}
+];
+function half(x){return Math.max(0.5,Math.round(x*2)/2)}
+function menu(A,C){
+  const dairyOK = !A.diet.includes('lactose');
+  const seaOK = !A.diet.includes('seafood');
+  const pool = (A.diet.includes('veg')?PROT.veg:PROT.omni).filter(([n,s])=>seaOK||!s);
+  const brk = BRK.filter(x=>dairyOK||!x.d), snk = SNK.filter(x=>dairyOK||!x.d);
+  // 各餐占比：早25 午35 晚30 加10
+  const sh = {b:.25,l:.35,d:.30,s:.10};
+  const per = k=>({p:C.p*sh[k],c:C.c*sh[k]});
+  const palm = k=>Math.min(2.5,half(per(k).p/25));
+  const fist = k=>Math.min(3,half(per(k).c/28));
+  return [0,1,2,3,4,5,6].map(i=>({
+    day:'第 '+(i+1)+' 天',
+    meals:[
+      ['早餐',Math.round(C.kcal*sh.b),brk[i%brk.length].t,'蛋白质约 '+palm('b')+' 掌，主食约 '+fist('b')+' 拳'],
+      ['午餐',Math.round(C.kcal*sh.l),pool[i%pool.length][0]+' + '+CARB[i%CARB.length]+' + '+VEG[i%VEG.length],'蛋白质约 '+palm('l')+' 掌，主食约 '+fist('l')+' 拳，蔬菜 2 拳以上'],
+      ['晚餐',Math.round(C.kcal*sh.d),pool[(i+3)%pool.length][0]+' + '+CARB[(i+2)%CARB.length]+' + '+VEG[(i+3)%VEG.length],'蛋白质约 '+palm('d')+' 掌，主食约 '+fist('d')+' 拳，蔬菜 2 拳以上'],
+      ['加餐',Math.round(C.kcal*sh.s),snk[i%snk.length].t,'下午或训练前后吃']
+    ]
+  }));
+}
+
+/* ================= 渲染 ================= */
+const F = x=>x.toFixed(1);
+function summaryCard(A,C){
+  let w='';
+  if(C.flagged) w+='<div class="warn">你勾选了怀孕/哺乳、慢性病或年龄未满 18 岁。这种情况我只给「维持体重」的参考，不做热量缺口。开始训练或调整饮食前，请先问过医生。</div>';
+  if(C.low && !C.flagged && (A.goal==='fat'||A.goal==='shape')) w+='<div class="warn">你的 BMI 偏低（'+F(C.bmi)+'），不建议再减重，所以热量按维持来算，重点放在力量训练和吃够蛋白质。</div>';
+  const wk = Math.abs(C.weekly)<0.05 ? '体重基本持平' : (C.weekly<0?'每周约 -':'每周约 +')+F(Math.abs(C.weekly))+' kg（估算）';
+  return '<div class="card"><h3>你的专属方案</h3>'+
+  '<div class="muted">目标：'+GOAL[A.goal]+' · 每周练 '+A.days+' 次 · 每次约 '+A.mins+' 分钟</div>'+w+
+  '<div class="kpis">'+
+  '<div class="kpi"><small>BMI</small><b>'+F(C.bmi)+'</b></div>'+
+  '<div class="kpi"><small>基础代谢（静息）</small><b>'+C.bmr+' kcal</b></div>'+
+  '<div class="kpi"><small>每日总消耗（估）</small><b>'+C.tdee+' kcal</b></div>'+
+  '<div class="kpi"><small>每日建议摄入</small><b>'+C.kcal+' kcal</b></div>'+
+  '<div class="kpi"><small>蛋白质</small><b>'+C.p+' g</b></div>'+
+  '<div class="kpi"><small>碳水</small><b>'+C.c+' g</b></div>'+
+  '<div class="kpi"><small>脂肪</small><b>'+C.f+' g</b></div>'+
+  '<div class="kpi"><small>预期体重变化</small><b style="font-size:14px">'+wk+'</b></div></div>'+
+  '<div class="muted">以上都是公式估算，不是医学诊断。按 2–3 周的实际体重变化再微调。</div></div>';
+}
+function workoutCard(A){
+  const W = workout(A); const [sets,reps,rest] = REPS[A.exp];
+  let h = '<div class="card"><h3>每周训练安排</h3><div class="muted">每个动作之间休息 '+rest+'；每组留 2–3 次余力，不要练到力竭。</div>';
+  W.forEach((d,i)=>{
+    h += '<div class="day"><h4><span>'+d.day+'</span>'+d.title+'</h4>';
+    if(d.cardio){
+      h += '<ul class="t"><li>快走、椭圆机或骑车 30–40 分钟，强度以「能说话、不能唱歌」为准</li><li>结束后做 8–10 分钟拉伸：大腿前后侧、臀部、胸肩</li></ul>';
+    } else {
+      h += '<ol>'+d.ex.map(e=>'<li>'+e+' <i>'+exLine(e,A)+'</i></li>').join('')+'</ol>';
+    }
+    h += '</div>';
+  });
+  const cardio = (A.goal==='fat'||A.goal==='shape') ? '每周另外加 2–3 次快走或其他有氧，每次 30 分钟。' : '每周加 1–2 次轻松有氧，每次 20–30 分钟即可。';
+  h += '<div class="day"><h4><span>其他</span>有氧与日常</h4><ul class="t"><li>'+cardio+'</li><li>日常步数争取 7000–9000 步。</li></ul></div>';
+  h += '<div class="day"><h4><span>进阶</span>怎么加重量</h4><ul class="t"><li>热身 5–8 分钟：关节活动加上第一个动作的空杆或轻重量。</li><li>某个动作连续两次、每组都做到次数上限，下次就加一点重量（哑铃加 1–2 kg，或换更强的弹力带）。</li><li>徒手动作做不到加重时，改成放慢下放速度（3 秒）或增加每组次数。</li></ul></div>';
+  if(A.injury.length && !A.injury.includes('none')){
+    const map={k:'膝盖',b:'腰背',s:'肩颈'}; const names=A.injury.filter(x=>map[x]).map(x=>map[x]).join('、');
+    h += '<div class="warn">已避开对「'+names+'」压力大的动作。任何动作如果出现刺痛（不是肌肉酸），马上停下来，必要时去看医生。</div>';
+  }
+  return h+'</div>';
+}
+function menuCard(A,C){
+  const M = menu(A,C);
+  let h = '<div class="card"><h3>7 天饮食示例</h3><div class="muted">每日约 '+C.kcal+' kcal；1 掌 ≈ 手掌大小、厚度的肉/豆制品，1 拳 ≈ 一个拳头的熟主食。份量是估算，吃到七分饱即可。点每一天展开。</div>'+
+  M.map((d,i)=>'<details class="dd"'+(i===0?' open':'')+'><summary>'+d.day+'</summary>'+
+    d.meals.map(m=>'<div class="meal"><b>'+m[0]+'</b> <small>约 '+m[1]+' kcal</small><br>'+m[2]+'<br><small>'+m[3]+'</small></div>').join('')+'</details>').join('')+'</div>';
+  let extra='';
+  if(A.eat!=='cook'){
+    extra = '<div class="day"><h4><span>外食</span>怎么点</h4><ul class="t"><li>选清蒸、水煮、炖、烤，少选油炸、勾芡和浓汤。</li><li>主食点小份，酱汁分开放。</li><li>麻辣烫选清汤，多放蔬菜和肉类，少放芝麻酱。</li><li>便利店：茶叶蛋、无糖豆浆、即食鸡胸肉、玉米、沙拉都是可以的。</li></ul></div>';
+  }
+  return h.replace(/<\/div><\/div>$/,'</div>'+extra+'</div>');
+}
+function tipsCard(A,C){
+  return '<div class="card"><h3>小贴士</h3><ul class="t">'+
+  '<li><b>喝水：</b>每天 1.5–2 升，训练日再多一点。</li>'+
+  '<li><b>睡眠：</b>尽量 7–8 小时，睡不够会更容易饿、恢复也慢。</li>'+
+  '<li><b>称重：</b>每周固定同一天、同一时间（早上空腹）称 1–2 次，看趋势，不盯单日数字。</li>'+
+  '<li><b>生理期：</b>体重会因水分波动，不用慌。状态差就降低强度或改成散步拉伸，不必硬撑。</li>'+
+  '<li><b>身体信号：</b>头晕、心慌、持续乏力或生理期紊乱，说明吃得太少或练得太多，请调整并咨询医生。</li>'+
+  '<li><b>复盘：</b>坚持 2–3 周后，用新的体重和感受再来算一次，计划也会跟着更新。</li></ul></div>';
+}
+function planText(A,C){
+  let t='【我的健身计划】\n目标：'+GOAL[A.goal]+'\n每日建议摄入 '+C.kcal+' kcal（蛋白质 '+C.p+'g / 碳水 '+C.c+'g / 脂肪 '+C.f+'g）\n\n训练安排：\n';
+  workout(A).forEach(d=>{ t+=d.day+' '+d.title+'：'+(d.cardio?'有氧 30–40 分钟 + 拉伸':d.ex.join('、'))+'\n' });
+  return t+'\n（公式估算，非医学建议）';
+}
+function copyText(t){
+  try{ if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(t) } }catch(e){}
+  const ta=el('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity=0; document.body.appendChild(ta); ta.select();
+  try{document.execCommand('copy')}catch(e){} ta.remove(); return Promise.resolve();
+}
+
+/* ================= 对话流程 ================= */
+async function showResult(my){
+  const C = calc(A);
+  await say(summaryCard(A,C),true);
+  while(true){
+    if(my!==runId) return;
+    const c = await pick('想先看哪一部分？',[
+      {label:'训练计划',value:'w',cls:''},{label:'饮食计划',value:'m'},{label:'小贴士',value:'t'},
+      {label:'复制训练摘要',value:'c'},{label:'重新开始',value:'r',cls:'ghost'}]);
+    if(my!==runId) return;
+    if(c==='w') await say(workoutCard(A),true);
+    else if(c==='m') await say(menuCard(A,C),true);
+    else if(c==='t') await say(tipsCard(A,C),true);
+    else if(c==='c'){ await copyText(planText(A,C)); await say('已复制，可以直接粘贴发给朋友或存到备忘录。'); }
+    else if(c==='r'){ try{localStorage.removeItem('fit_A')}catch(e){} start(); return }
+  }
+}
+async function flow(my){
+  chat.innerHTML=''; clearTray(); A={};
+  let saved=null; try{saved=JSON.parse(localStorage.getItem('fit_A')||'null')}catch(e){}
+  await say('你好呀，我是健身小助手。回答几个小问题，我就能按你的身体情况，排出训练和饮食计划。');
+  if(saved){
+    const r = await pick('看到你上次已经做过一份计划，要继续用吗？',[{label:'继续上次的',value:'y'},{label:'重新来一份',value:'n'}]);
+    if(r==='y'){ A=saved; return showResult(my) }
+  }
+  await say('所有数据只在你的手机上计算，不会上传。');
+  A.goal = await pick('先说说你最想达成什么？',[{label:'减脂',value:'fat'},{label:'增肌塑形',value:'muscle'},{label:'改善体态、紧致',value:'shape'},{label:'保持健康',value:'keep'}]);
+  A.age = await num('你今年多大了？',{min:14,max:75,unit:'岁',ph:'例如 30'});
+  A.height = await num('身高多少？',{min:130,max:200,unit:'cm',ph:'例如 163'});
+  A.weight = await num('现在体重多少？（早上空腹最准）',{min:30,max:150,unit:'kg',ph:'例如 58'});
+  A.waist = await num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',ph:'例如 72',skip:true});
+  A.exp = await pick('你现在的运动基础是？',[{label:'零基础',value:'new'},{label:'偶尔运动',value:'some'},{label:'规律训练过',value:'reg'}]);
+  A.days = await pick('每周打算练几天？',[{label:'2 天',value:2},{label:'3 天',value:3},{label:'4 天',value:4},{label:'5 天',value:5}]);
+  A.mins = await pick('每次大概能练多久？',[{label:'30 分钟',value:30},{label:'45 分钟',value:45},{label:'60 分钟',value:60}]);
+  A.place = await pick('主要在哪里练？',[{label:'健身房',value:'gym'},{label:'家里有哑铃/弹力带',value:'home'},{label:'家里徒手',value:'body'}]);
+  const inj = await multi('有没有哪些部位不舒服或受过伤？（可多选）',[{label:'膝盖',value:'k'},{label:'腰背',value:'b'},{label:'肩颈',value:'s'},{label:'都没有',value:'none'}],'none');
+  A.injury = inj;
+  A.health = await multi('下面这些情况有没有？没有就选「都没有」。',[{label:'怀孕或哺乳期',value:'preg'},{label:'有慢性病或在服药',value:'chronic'},{label:'都没有',value:'none'}],'none');
+  A.diet = await multi('饮食上有什么忌口？（可多选）',[{label:'吃蛋奶素',value:'veg'},{label:'乳糖不耐',value:'lactose'},{label:'海鲜过敏',value:'seafood'},{label:'没有忌口',value:'none'}],'none');
+  A.eat = await pick('平时吃饭主要是？',[{label:'外食为主',value:'out'},{label:'自己做饭',value:'cook'},{label:'两种都有',value:'mix'}]);
+  try{localStorage.setItem('fit_A',JSON.stringify(A))}catch(e){}
+  await say('好的，我按你的情况算一下……');
+  await showResult(my);
+}
+function start(){ runId++; flow(runId) }
+start();
+</script>
+</body>
+</html>
