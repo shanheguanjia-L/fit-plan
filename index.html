@@ -718,6 +718,8 @@ const ACT_FACTOR = {2:1.35,3:1.45,4:1.55,5:1.6};  // 每週練幾天 → 活動�
 const SESSION_N = {30:4,45:5,60:6};               // 每次分鐘數 → 每天動作數
 const INJ_NAME = {k:'膝盖',b:'腰背',s:'肩颈'};    // 不適部位代碼 → 顯示名稱
 const EGG = '鸡蛋（煮熟）';
+const PROTEIN_NOTE_RATIO = 0.85;                   // 菜單蛋白質平均低於目標這個比例時，菜單卡片要說明
+const OVER_TOL = 1.03;                            // 菜單整天熱量超過目標多少倍才進行第二段校準
 const MEAL_SHARE = {b:.25,l:.35,d:.30,s:.10};     // 早餐、午餐、晚餐、加餐的熱量/蛋白質比例
 
 /* ---------- 動作資料與索引 ---------- */
@@ -850,9 +852,9 @@ function menu(A,C){
     const meals=[];
     // 早餐：固定 1 份蛋（100 g），蛋白質不夠再加豆浆/酸奶/牛奶
     {
-      const pM=C.p*sh.b, items=[{n:EGG,g:100}];
+      const pM=C.p*sh.b, items=[{n:EGG,g:100,pr:1}];
       const left=pM-egg.p;
-      if(left>6){ const e=pickFrom(BEXTRA,i,A); items.push({n:e,g:Math.min(300,g5(left/FM[e].p*100))}) }
+      if(left>6){ const e=pickFrom(BEXTRA,i,A); items.push({n:e,g:Math.min(300,g5(left/FM[e].p*100)),pr:1}) }
       const st=BSTAPLE[i%BSTAPLE.length];
       items.push({n:st,g:g5(C.c*sh.b/FM[st].cb*100*0.75),st:1});
       const fr=FRUITS[i%FRUITS.length]; items.push({n:fr[0],g:fr[1]});
@@ -861,10 +863,10 @@ function menu(A,C){
     // 午餐、晚餐：[名稱, 蛋白質池位移, 比例]
     [['午餐',0,sh.l],['晚餐',3,sh.d]].forEach(function(m,mi){
       const pM=C.p*m[2], pn=pickFrom(proteinPool,i+m[1],A), pf=FM[pn];
-      const items=[]; let g=Math.min(260,g5(pM/pf.p*100)); items.push({n:pn,g:g});
+      const items=[]; let g=Math.min(260,g5(pM/pf.p*100)); items.push({n:pn,g:g,pr:1});
       const got=pf.p*g/100;
       // 主菜蛋白質不到目標 8 成就補蛋（每個 50 g、約 6.3 g 蛋白質），1–3 個
-      if(got<pM*0.8 && allowed(egg,A)){ const c=Math.min(3,Math.max(1,Math.round((pM-got)/(egg.p/2)))); items.push({n:EGG,g:c*egg.u}) }
+      if(got<pM*0.8 && allowed(egg,A)){ const c=Math.min(3,Math.max(1,Math.round((pM-got)/(egg.p/2)))); items.push({n:EGG,g:c*egg.u,pr:1}) }
       const st=pickFrom(STAPLE,i+(mi?2:0),A);
       items.push({n:st,g:g5(C.c*m[2]/FM[st].cb*100*0.8),st:1});
       items.push({n:pickFrom(VEGS,i+(mi?2:0),A),g:100});
@@ -884,6 +886,22 @@ function menu(A,C){
     if(stk>0){
       const fct=Math.min(1.8,Math.max(0.5,(C.kcal-(tot-stk))/stk));
       meals.forEach(function(m){ m.items.forEach(function(it){ if(it.st) it.g=g5(it.g*fct) }) });
+    }
+    /* 第二、三段校準（熱量目標優先，蛋白質盡量靠近）：
+       植物性蛋白每克蛋白質的熱量高（老豆腐 8、黑豆 15、鷹嘴豆 18 kcal，雞胸肉才 5），減脂的目標熱量又低，
+       光蛋白質食物就可能超過整天的目標，主食縮到下限也救不回來（蛋奶素最多超標 60%）。
+       所以主食縮到下限、整天仍超過目標 3% 以上時，才把蛋白質食物縮小（最低 55%）；還是超過，才把主食再縮（最低再縮到 40%）。
+       沒超過 3% 的天完全不動。 */
+    function kcalSplit(){ let t=0,st=0,pr=0; meals.forEach(function(m){ m.items.forEach(function(it){ const k=itemStats(it).k; t+=k; if(it.st) st+=k; if(it.pr) pr+=k }) }); return {t:t,st:st,pr:pr} }
+    let ks=kcalSplit();
+    if(ks.t>C.kcal*OVER_TOL && ks.pr>0){
+      const fp=Math.min(1,Math.max(0.55,(C.kcal-(ks.t-ks.pr))/ks.pr));
+      meals.forEach(function(m){ m.items.forEach(function(it){ if(it.pr) it.g=g5(it.g*fp) }) });
+      ks=kcalSplit();
+      if(ks.t>C.kcal*OVER_TOL && ks.st>0){
+        const f2=Math.min(1,Math.max(0.4,(C.kcal-(ks.t-ks.st))/ks.st));
+        meals.forEach(function(m){ m.items.forEach(function(it){ if(it.st) it.g=g5(it.g*f2) }) });
+      }
     }
     let day={k:0,p:0,c:0,f:0};
     meals.forEach(function(m){
@@ -1041,6 +1059,11 @@ function menuCard(A,C){
     }).join('')+
     '<div class="muted">全天：蛋白质 '+Math.round(d.total.p)+' g · 碳水 '+Math.round(d.total.c)+' g · 脂肪 '+Math.round(d.total.f)+' g</div></details>';
   }).join('');
+  // 蛋白質平均吃不到目標的 85% 時，如實說明（常見於蛋奶素 + 減脂：植物性蛋白每克蛋白質的熱量高，在低熱量下很難吃夠）
+  const avgP=M.reduce(function(s,d){ return s+d.total.p },0)/M.length;
+  if(avgP<C.p*PROTEIN_NOTE_RATIO){
+    h += '<div class="warn">按你的热量目标，这份菜单每天的蛋白质平均约 '+Math.round(avgP)+' g，比目标 '+C.p+' g 低。蛋白质食物的热量比较高，在这个热量下不容易吃够。想补足，可以在热量允许的范围内多加蛋、豆制品或无糖酸奶，也可以请营养师帮你调整。</div>';
+  }
   if(A.eat!=='cook'){
     h += '<div class="day"><h4><span>外食</span>怎么点</h4><ul class="t"><li>选清蒸、水煮、炖、烤，少选油炸、勾芡和浓汤。</li><li>主食点小份，酱汁分开放。</li><li>麻辣烫选清汤，多放蔬菜和肉类，少放芝麻酱。</li><li>便利店：茶叶蛋、无糖豆浆、即食鸡胸肉、玉米、沙拉都是可以的。</li></ul></div>';
   }
