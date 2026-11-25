@@ -33,7 +33,12 @@ header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12
 .chip.on{background:var(--acc);color:#fff}
 .chip.go{background:var(--acc);color:#fff;font-weight:600}
 .chip.ghost{border-color:var(--line);color:var(--sub)}
-.numrow{display:flex;gap:8px;align-items:center}
+.stepper{display:flex;align-items:center;justify-content:space-between}
+.sdisp{flex:1;text-align:center;font-size:15px;color:var(--sub)}
+.sdisp b{font-size:28px;color:var(--ink)}
+.sbtn{padding:9px 0;width:48px;text-align:center;margin:0 2px;font-size:14px}
+.sact{display:flex;gap:8px;margin-top:12px}
+.sact .go{flex:1}
 .numrow input{flex:1;font-size:20px;padding:9px 12px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;min-width:0}
 .numrow input:focus{outline:none;border-color:var(--acc)}
 .numrow .unit{color:var(--sub)}
@@ -124,23 +129,35 @@ function multi(q, opts, exclusive){
     box.appendChild(ok); tray.appendChild(box); toBottom();
   });
 }
-// 数字输入
+// 数字选择：点 − / + 调整，不用输入框也不弹键盘
 function num(q, o){
   return new Promise(async res=>{
     await say(q); clearTray();
-    const wrap = el('div'); const row = el('div','numrow');
-    const inp = el('input'); inp.type='number'; inp.inputMode='decimal'; inp.placeholder=o.ph||''; inp.min=o.min; inp.max=o.max; inp.step='any';
-    const unit = el('span','unit',o.unit);
-    const ok = el('button','chip go','确定');
-    row.append(inp,unit,ok); wrap.appendChild(row);
-    if(o.skip){ const s=el('button','chip ghost','跳过'); s.style.marginTop='8px'; s.onclick=()=>{add('user','跳过');clearTray();res(null)}; wrap.appendChild(s); }
-    tray.appendChild(wrap); toBottom();
-    const submit = async ()=>{
-      const v = parseFloat(inp.value);
-      if(!(v>=o.min && v<=o.max)){ inp.value=''; inp.placeholder='请输入 '+o.min+'–'+o.max; inp.focus(); return }
-      add('user', v+' '+o.unit); clearTray(); res(v);
+    let v = o.def;
+    const dec = (String(o.s1).indexOf('.')>=0);
+    const fmt = x => dec ? (Math.round(x*10)/10).toFixed(1) : String(Math.round(x));
+    const wrap = el('div');
+    const row = el('div','stepper');
+    const disp = el('div','sdisp');
+    const val = el('b','',fmt(v)); const unit = el('span','',' '+o.unit);
+    disp.appendChild(val); disp.appendChild(unit);
+    const upd = ()=>{ val.textContent = fmt(v) };
+    const mk = (label,d)=>{
+      const b = el('button','chip sbtn',label);
+      b.onclick = ()=>{ v = Math.min(o.max, Math.max(o.min, Math.round((v+d)*10)/10)); upd() };
+      return b;
     };
-    ok.onclick = submit; inp.onkeydown = e=>{ if(e.key==='Enter') submit() };
+    row.appendChild(mk('−'+o.s2,-o.s2)); row.appendChild(mk('−'+o.s1,-o.s1));
+    row.appendChild(disp);
+    row.appendChild(mk('+'+o.s1,o.s1)); row.appendChild(mk('+'+o.s2,o.s2));
+    wrap.appendChild(row);
+    const act = el('div','sact');
+    const ok = el('button','chip go','确定');
+    ok.onclick = ()=>{ add('user', fmt(v)+' '+o.unit); clearTray(); res(v) };
+    act.appendChild(ok);
+    if(o.skip){ const sk=el('button','chip ghost','跳过'); sk.onclick=()=>{add('user','跳过');clearTray();res(null)}; act.appendChild(sk); }
+    wrap.appendChild(act);
+    tray.appendChild(wrap); toBottom();
   });
 }
 
@@ -358,10 +375,10 @@ async function flow(my){
   }
   await say('所有数据只在你的手机上计算，不会上传。');
   A.goal = await pick('先说说你最想达成什么？',[{label:'减脂',value:'fat'},{label:'增肌塑形',value:'muscle'},{label:'改善体态、紧致',value:'shape'},{label:'保持健康',value:'keep'}]);
-  A.age = await num('你今年多大了？',{min:14,max:75,unit:'岁',ph:'例如 30'});
-  A.height = await num('身高多少？',{min:130,max:200,unit:'cm',ph:'例如 163'});
-  A.weight = await num('现在体重多少？（早上空腹最准）',{min:30,max:150,unit:'kg',ph:'例如 58'});
-  A.waist = await num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',ph:'例如 72',skip:true});
+  A.age = await num('你今年多大了？点 − ＋ 调到你的年龄',{min:14,max:75,unit:'岁',def:30,s1:1,s2:5});
+  A.height = await num('身高多少？点 − ＋ 调整',{min:130,max:200,unit:'cm',def:160,s1:1,s2:5});
+  A.weight = await num('现在体重多少？点 − ＋ 调到你的数字（早上空腹最准）',{min:30,max:150,unit:'kg',def:55,s1:0.5,s2:5});
+  A.waist = await num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',def:70,s1:1,s2:5,skip:true});
   A.exp = await pick('你现在的运动基础是？',[{label:'零基础',value:'new'},{label:'偶尔运动',value:'some'},{label:'规律训练过',value:'reg'}]);
   A.days = await pick('每周打算练几天？',[{label:'2 天',value:2},{label:'3 天',value:3},{label:'4 天',value:4},{label:'5 天',value:5}]);
   A.mins = await pick('每次大概能练多久？',[{label:'30 分钟',value:30},{label:'45 分钟',value:45},{label:'60 分钟',value:60}]);
