@@ -90,15 +90,24 @@ header small{display:block;color:var(--mut);font-size:12px;line-height:16px}
 .rec{display:inline-block;margin-left:8px;padding:0 4px;border:1px solid var(--line);border-radius:4px;color:var(--mut);font-size:11px;line-height:16px;font-weight:400;vertical-align:1px}
 .chip.ok0{flex:1;background:var(--card);border-color:var(--ink);color:var(--ink)}
 .sact .back{order:-1}
+.opt.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.opt.on small{color:rgba(247,244,238,.75)}
+.opts .go{display:block;width:100%;margin-top:8px}
+.chip:disabled{opacity:.6;cursor:default}
 
-/* 數字選擇：下方的刻度尺是這個頁面的簽名（量身體的尺），數字變動時刻度會跟著移動 */
-.stepper{display:flex;align-items:center;justify-content:space-between}
-.sdisp{flex:1;position:relative;padding-bottom:20px;text-align:center;font-size:14px;color:var(--mut);
+/* 身體數據卡：每行 = 名稱 | −5 −1 | 數字（點一下確認，底下是刻度尺） | +1 +5 */
+.nrow{display:flex;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.nrow:first-child{border-top:0}
+.nlab{flex:none;width:44px;font-size:14px;line-height:18px;color:var(--sub)}
+.nlab small{display:block;font-size:11px;line-height:14px;color:var(--mut)}
+.nbtn{flex:none;width:36px;min-height:40px;margin-left:4px;padding:0;text-align:center;font-size:13px}
+.nval{flex:1;min-width:0;margin:0 0 0 4px;min-height:40px;padding:0 0 10px;border:0;border-radius:0;background-color:transparent;font-family:inherit;font-size:16px;line-height:30px;color:var(--mut);
   background-image:linear-gradient(90deg,var(--tick) 1px,transparent 1px),linear-gradient(90deg,var(--tick) 1px,transparent 1px);
-  background-size:8px 6px,40px 12px;background-repeat:repeat-x;background-position:var(--off,0) 100%,var(--off,0) 100%}
-.sdisp::after{content:"";position:absolute;left:50%;bottom:0;width:2px;height:16px;margin-left:-1px;background:var(--acc)}
-.sdisp b{font-size:32px;line-height:40px;color:var(--ink)}
-.sbtn{width:48px;margin:0 2px;padding:10px 0;text-align:center;font-size:14px}
+  background-size:8px 5px,40px 9px;background-repeat:repeat-x;background-position:var(--off,0) 100%,var(--off,0) 100%}
+.nval.on{color:var(--ink);font-weight:500}
+.nbox .sact{margin-top:12px}
+
+/* 底部按鈕列（身體數據卡的「確定」「改上一題」） */
 .sact{display:flex;gap:8px;margin-top:16px}
 .sact .go{flex:1}
 
@@ -621,6 +630,8 @@ function allowed(f,A){
   if(f.t==='d' && A.diet.indexOf('lactose')>=0) return false;
   if(f.t==='s' && A.diet.indexOf('seafood')>=0) return false;
   if((f.t==='m'||f.t==='s') && A.diet.indexOf('veg')>=0) return false;
+  if(A.diet.indexOf('nobeef')>=0 && f.n==='瘦牛肉（烤熟）') return false;   // 不吃牛羊肉（食物庫目前只有牛肉）
+  if(A.diet.indexOf('nopork')>=0 && f.n==='猪里脊（烤熟）') return false;
   return true;
 }
 function pickFrom(list,i,A){
@@ -891,6 +902,143 @@ function planText(A,C){
 }
 </script>
 <script>
+/* ==== src/js/questions.js ==== */
+/* 問卷：問什麼、有哪些選項、答完怎麼回應、答案怎麼寫進 A。純資料與純函式，不碰 DOM（Node 測試可直接驗證所有題目）。
+   app.js 負責把這些步驟畫成聊天、處理「改上一題」。
+   設計原則（行為引導）：
+   - 少問：年齡、身高、體重合成一張卡；每週幾天與每次多久合成「你能留出多少時間」一題（共 10 題，原本 14 題）。
+   - 用生活語言問，不問術語：運動基礎問「最近三個月更像哪一種」，不適部位問「爬楼梯、下蹲时膝盖会不舒服吗」。
+   - 每題都有「說不清／還沒想好」這類出口，並給一個保守的預設；有依據時才標「建议」（只是建議，不是結論）。
+   - 答完用一句話回應，並且只說程式真的會做的事。 */
+
+const BMI_LOW = 18.5, BMI_HIGH = 24;     // 中國常用分界：低於 18.5 偏低，24 以上偏高
+function bmiOf(h,w){ return w/Math.pow(h/100,2) }
+function autoGoal(bmi){ return bmi>=BMI_HIGH ? 'fat' : bmi<BMI_LOW ? 'muscle' : 'shape' }
+// 「我不確定，幫我定」：依運動基礎給容易坚持的安排
+const AUTO_TIME = {new:{days:3,mins:30}, some:{days:3,mins:45}, reg:{days:4,mins:45}};
+
+const REACT_GOAL = {
+  fat:'好，目标减脂。我会按温和的节奏算，不会让你吃得太少。',
+  muscle:'好，目标增肌塑形。我会把蛋白质和训练量排得足一些。',
+  shape:'好，想改善体态、紧致线条。力量训练会是重点。',
+  keep:'好，保持健康。我们按稳定、能长期坚持来排。'
+};
+const has2 = (v,x) => v.indexOf(x)>=0;
+
+const STEPS = [
+  // 1 身体数据：一张卡四行，不一题一题地问
+  {k:'body', type:'nums',
+   q:'先认识一下你。年龄、身高、体重大概是多少？点 − ＋ 调到你的数字（点数字也算确认），腰围可以不填。',
+   fields:[
+     {k:'age',label:'年龄',unit:'岁',min:14,max:75,def:30,s1:1,s2:5},
+     {k:'height',label:'身高',unit:'cm',min:130,max:200,def:160,s1:1,s2:5},
+     {k:'weight',label:'体重',unit:'kg',min:30,max:150,def:55,s1:0.5,s2:5},
+     {k:'waist',label:'腰围',unit:'cm',min:50,max:140,def:70,s1:1,s2:5,optional:true}],
+   set:(A,v)=>{ A.age=v.age; A.height=v.height; A.weight=v.weight; A.waist=v.waist },
+   react:(v)=>{ const b=bmiOf(v.height,v.weight); return b<BMI_LOW ? '你的 BMI 是 '+b.toFixed(1)+'，偏低。之后我不会给你安排热量缺口。' : null }},
+  // 2 目标
+  {k:'goal', type:'pick',
+   q:'你最想改变什么？',
+   opts:(A)=>{ const b=bmiOf(A.height,A.weight); return [
+     {label:'减脂',sub:'把体脂降下来，同时尽量保住肌肉',value:'fat',rec:b>=BMI_HIGH},
+     {label:'增肌塑形',sub:'练出线条，让身体更有力量',value:'muscle',rec:b<BMI_LOW},
+     {label:'改善体态、紧致',sub:'肩背更挺，整个人更紧致',value:'shape'},
+     {label:'保持健康',sub:'不追求变化，把现在的状态稳住',value:'keep'},
+     {label:'说不清，帮我判断',sub:'我按你的身高体重给一个建议',value:'auto'}] },
+   set:(A,v)=>{ A.goal = v==='auto' ? autoGoal(bmiOf(A.height,A.weight)) : v },
+   react:(v,A,opt)=>{
+     const b=bmiOf(A.height,A.weight);
+     if(opt && opt.value==='auto') return '我先帮你判断：BMI '+b.toFixed(1)+'，建议先按「'+GOAL[A.goal]+'」来排。不合适的话，点「改上一题」重选就行。';
+     if(A.goal==='fat' && b<BMI_LOW) return '你的 BMI 偏低，减脂这一项我会按维持来算，重点放在力量训练和吃够蛋白质。';
+     return REACT_GOAL[A.goal] }},
+  // 3 運動基礎：用生活情境問
+  {k:'exp', type:'pick',
+   q:'最近三个月，你的运动情况更像哪一种？',
+   opts:()=>[
+     {id:'none',label:'几乎没怎么运动',sub:'平时以坐着和走路为主',value:'new'},
+     {id:'some',label:'偶尔动一动',sub:'每周 1–2 次，没有固定节奏',value:'some'},
+     {id:'back',label:'以前练过，中断了一阵子',sub:'想重新开始',value:'some'},
+     {id:'reg',label:'一直有固定的训练习惯',sub:'每周 3 次以上',value:'reg'}],
+   set:(A,v)=>{ A.exp=v },
+   react:(v,A,opt)=> !opt ? null : opt.id==='none' ? '没关系，从零开始最稳，动作和组数我会先排得轻松一点。'
+     : opt.id==='back' ? '好，重新开始最重要的是别一下子练太猛，我会按「有一点基础」来排。'
+     : opt.id==='reg' ? '好，那训练量我会排得足一些。' : null },
+  // 4 時間：每週幾天、每次多久合成一題，用「現實能留出多少」來問
+  {k:'time', type:'pick',
+   q:'时间上，你现实一点能留出多少？先选能坚持的，不是最理想的。',
+   opts:(A)=>[
+     {label:'每周 2 次，每次约 30 分钟',sub:'时间比较紧，先把习惯养起来',value:{days:2,mins:30}},
+     {label:'每周 3 次，每次约 30 分钟',sub:'循序渐进，容易坚持',value:{days:3,mins:30},rec:A.exp==='new'},
+     {label:'每周 3 次，每次约 45 分钟',sub:'节奏比较平衡',value:{days:3,mins:45},rec:A.exp==='some'},
+     {label:'每周 4 次，每次约 45 分钟',sub:'比较投入，记得留出休息和睡眠',value:{days:4,mins:45},rec:A.exp==='reg'},
+     {label:'每周 5 次，每次约 1 小时',sub:'全力投入，适合已经有基础的',value:{days:5,mins:60}},
+     {label:'我不确定，帮我定',sub:'按你的基础，给一个容易坚持的安排',value:{auto:true}}],
+   set:(A,v)=>{ const t = v.auto ? AUTO_TIME[A.exp] : v; A.days=t.days; A.mins=t.mins },
+   react:(v,A)=> v.auto ? '那就先按你的基础来：每周 '+A.days+' 次，每次约 '+A.mins+' 分钟，先把习惯养起来。' : null },
+  // 5 場地
+  {k:'place', type:'pick',
+   q:'你平时更方便在哪里练？',
+   opts:()=>[
+     {id:'gym',label:'健身房',sub:'有器械可以用',value:'gym'},
+     {id:'home',label:'家里有哑铃/弹力带',sub:'在家练，有一点器材',value:'home'},
+     {id:'body',label:'家里徒手',sub:'什么器材都没有，一张垫子就够',value:'body'},
+     {id:'undecided',label:'还没想好',sub:'先按徒手排，之后随时可以重新来一份',value:'body'}],
+   set:(A,v)=>{ A.place=v },
+   react:(v,A,opt)=> opt && opt.id==='undecided' ? '好，先按徒手排。想换成有器材的，点最下面的「重新开始」就行。' : null },
+  // 6 重點部位
+  {k:'focus', type:'multi', rows:true,
+   q:'有没有特别想重点练的地方？（可多选）',
+   opts:()=>[
+     {label:'臀腿线条',sub:'想要更翘、更紧实的臀腿',value:'hips'},
+     {label:'腰腹',sub:'想让腰腹更平坦、更有力',value:'abs'},
+     {label:'手臂',sub:'想让手臂更紧致',value:'arms'},
+     {label:'背部体态',sub:'想让肩背更挺，改善圆肩、驼背',value:'posture'},
+     {label:'没有特别想要的',sub:'整体均衡就好',value:'none'}],
+   set:(A,v)=>{ A.focus=v },
+   react:(v)=> !has2(v,'none') ? '好，每个训练日我会加一小段「重点加练」。' : null },
+  // 7 不適：用「會不會」的情境問，不問術語
+  {k:'injury', type:'multi', rows:true,
+   q:'平时身体有没有这些情况？有的话，我会避开容易加重的动作。（可多选）',
+   opts:()=>[
+     {label:'爬楼梯、下蹲时，膝盖会不舒服',value:'k'},
+     {label:'久坐、弯腰后，腰会酸痛',value:'b'},
+     {label:'肩颈常常僵硬，抬手臂会痛',value:'s'},
+     {label:'都没有',value:'none'}],
+   set:(A,v)=>{ A.injury=v },
+   react:(v)=> !has2(v,'none') ? '收到，这些部位我会避开压力大的动作。' : null },
+  // 8 健康狀況
+  {k:'health', type:'multi', rows:true,
+   q:'下面这些情况有没有？有的话我会更保守。',
+   opts:()=>[
+     {label:'怀孕或哺乳期',sub:'只给维持体重的参考，不做热量缺口',value:'preg'},
+     {label:'有慢性病，或正在吃药',sub:'同样更保守，并建议先问过医生',value:'chronic'},
+     {label:'都没有',value:'none'}],
+   set:(A,v)=>{ A.health=v },
+   react:(v)=> !has2(v,'none') ? '好，我会更保守：只给维持体重的参考，不做热量缺口。开始训练前也请先问过医生。' : null },
+  // 9 忌口
+  {k:'diet', type:'multi', rows:true,
+   q:'吃的方面，有没有不吃或不能吃的？（可多选）',
+   opts:()=>[
+     {label:'吃蛋奶素',sub:'不吃肉和海鲜，蛋和奶可以',value:'veg'},
+     {label:'不吃牛羊肉',value:'nobeef'},
+     {label:'不吃猪肉',value:'nopork'},
+     {label:'喝牛奶会不舒服（乳糖不耐）',value:'lactose'},
+     {label:'不吃海鲜，或海鲜过敏',value:'seafood'},
+     {label:'没有忌口',value:'none'}],
+   set:(A,v)=>{ A.diet=v },
+   react:(v)=> !has2(v,'none') ? '收到，菜单会避开这些。' : null },
+  // 10 吃飯方式
+  {k:'eat', type:'pick',
+   q:'你平时吃饭，更多是怎么解决的？',
+   opts:()=>[
+     {label:'外食为主',sub:'食堂、外卖、餐厅',value:'out'},
+     {label:'自己做饭',sub:'食材自己买，自己做',value:'cook'},
+     {label:'两种都有',sub:'有时自己做，有时在外面吃',value:'mix'}],
+   set:(A,v)=>{ A.eat=v }}
+];
+const INTRO_HINT = '一共 '+STEPS.length+' 个小问题，选错了可以点「改上一题」。所有数据只在你的手机上计算，不会上传。';
+</script>
+<script>
 /* ==== src/js/app.js ==== */
 /* 聊天介面與問答流程（唯一碰 DOM 的檔案）。最後一個載入。
    頁面開頭的內嵌小段程式（dev.html / index.html）已先註冊錯誤提示條（#err）與 FIT_LOAD_FAILED；
@@ -900,7 +1048,7 @@ const $ = s => document.querySelector(s);
 const chat = $('#chat'), tray = $('#tray');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const STORE_KEY = 'fit_A';
-const PROG_TOTAL = 14;   // 問卷題數（目標、年齡、身高、體重、腰圍、基礎、天數、時間、場地、重點、不適、健康、忌口、飲食）
+const PROG_TOTAL = STEPS.length;   // 題數（見 questions.js）
 let answered = 0;
 function setProg(n){
   answered = n;
@@ -932,27 +1080,29 @@ async function say(html, wide){
 function clearTray(){tray.innerHTML=''}
 
 /* ---------- 回答元件（都放在聊天流最後的 #tray，隨頁面自然捲動） ----------
-   選項文字、說明都是本頁常數，不接受使用者輸入（innerHTML 安全）。
-   opts[i]：{label, value, sub?（一行說明）, rec?（顯示「建議」）, cls?}；o.back 為 true 時多一個「改上一題」。 */
+   選項文字、說明都是本頁常數（questions.js），不接受使用者輸入（innerHTML 安全）。
+   opts[i]：{label, value, sub?（一行說明）, rec?（顯示「建議」）, id?, cls?}；
+   o.back 為 true 時多一個「改上一題」；o.rows 為 true 或任一選項有 sub 時，用整列可點的版面。 */
 const BACK = {};   // 使用者按「改上一題」時回傳的標記
+let lastOpt = null;   // 最近一次點選的選項（讓 react 能依選項回應，例如兩個選項的 value 相同時）
 function backBtn(box,res){
   const b = el('button','chip ghost back','← 改上一题');
   b.onclick = ()=>{ clearTray(); res(BACK) };
   box.appendChild(b);
 }
 const recTag = x => x.rec ? '<span class="rec">建议</span>' : '';
+const optHtml = (x,rows) => rows ? '<b>'+x.label+recTag(x)+'</b>'+(x.sub?'<small>'+x.sub+'</small>':'') : x.label+recTag(x);
 // 单选
 function pick(q, opts, o){
   o = o||{};
   return new Promise(async res=>{
     if(q) await say(q);
     clearTray();
-    const rows = opts.some(x=>x.sub);
+    const rows = !!o.rows || opts.some(x=>x.sub);
     const box = el('div', rows?'opts':'chips');
     opts.forEach(x=>{
-      const b = el('button','chip'+(rows?' opt':'')+(x.cls?' '+x.cls:''),
-        rows ? '<b>'+x.label+recTag(x)+'</b><small>'+x.sub+'</small>' : x.label+recTag(x));
-      b.onclick = ()=>{ add('user',x.label); clearTray(); res(x.value) };
+      const b = el('button','chip'+(rows?' opt':'')+(x.cls?' '+x.cls:''), optHtml(x,rows));
+      b.onclick = ()=>{ lastOpt = x; add('user',x.label); clearTray(); res(x.value) };
       box.appendChild(b);
     });
     if(o.back) backBtn(box,res);
@@ -964,9 +1114,10 @@ function multi(q, opts, exclusive, o){
   o = o||{};
   return new Promise(async res=>{
     await say(q); clearTray();
-    const box = el('div','chips'); const sel = new Set();
+    const rows = !!o.rows || opts.some(x=>x.sub);
+    const box = el('div', rows?'opts':'chips'); const sel = new Set();
     const btns = opts.map(x=>{
-      const b = el('button','chip',x.label);
+      const b = el('button','chip'+(rows?' opt':''),optHtml(x,rows));
       b.onclick = ()=>{
         if(sel.has(x.value)){sel.delete(x.value)}
         else{
@@ -988,39 +1139,59 @@ function multi(q, opts, exclusive, o){
     tray.appendChild(box); toBottom();
   });
 }
-// 数字选择：点 − / + 调整，不用输入框也不弹键盘（微信里 <input> 不显示）
-// 起始数字只是示例：没动过就按下去，按钮会写明「就是 30 岁」，避免不小心拿示例数字去算计划
-function num(q, o){
+// 身体数据卡：几行「− ＋」数字，一次填完。不用 <input>（微信里不显示），也不弹键盘。
+// 起始数字只是示例：必填项要点过 − ＋ 或点一下数字才算确认，没确认前「确定」按钮是灰的并写明还差几项，
+// 避免不小心拿示例数字去算计划。选填项（腰围）默认「未填」，点数字可在「未填」和「已填」间切换。
+function nums(q, fields, o){
+  o = o||{};
   return new Promise(async res=>{
     await say(q); clearTray();
-    let v = o.def, touched = false;
-    const dec = (String(o.s1).indexOf('.')>=0);
-    const fmt = x => dec ? (Math.round(x*10)/10).toFixed(1) : String(Math.round(x));
-    const wrap = el('div');
-    const row = el('div','stepper');
-    const disp = el('div','sdisp');
-    const val = el('b','',fmt(v)); const unit = el('span','',' '+o.unit);
-    disp.appendChild(val); disp.appendChild(unit);
+    const wrap = el('div','nbox'); const S = {}, refresh = [];
+    const fmt = (f,x)=> (String(f.s1).indexOf('.')>=0) ? (Math.round(x*10)/10).toFixed(1) : String(Math.round(x));
     const ok = el('button','chip go','确定');
-    const sync = ()=>{
-      val.textContent = fmt(v); disp.style.setProperty('--off', (-v*8)+'px');
-      if(touched){ ok.textContent='确定'; ok.className='chip go' }
-      else { ok.textContent='就是 '+fmt(v)+' '+o.unit; ok.className='chip ok0' }
+    const syncOk = ()=>{
+      const left = fields.filter(f=>!f.optional && !S[f.k].touched);
+      if(left.length){ ok.textContent='还差 '+left.length+' 项没确认：'+left.map(f=>f.label).join('、'); ok.className='chip ok0'; ok.disabled=true }
+      else { ok.textContent='确定'; ok.className='chip go'; ok.disabled=false }
     };
-    const mk = (label,d)=>{
-      const b = el('button','chip sbtn',label);
-      b.onclick = ()=>{ v = Math.min(o.max, Math.max(o.min, Math.round((v+d)*10)/10)); touched = true; sync() };
-      return b;
-    };
-    sync();
-    row.appendChild(mk('−'+o.s2,-o.s2)); row.appendChild(mk('−'+o.s1,-o.s1));
-    row.appendChild(disp);
-    row.appendChild(mk('+'+o.s1,o.s1)); row.appendChild(mk('+'+o.s2,o.s2));
-    wrap.appendChild(row);
+    fields.forEach(f=>{
+      const s = S[f.k] = {v:f.def, touched:false, on:!f.optional};
+      const row = el('div','nrow');
+      row.appendChild(el('div','nlab',f.label+(f.optional?'<small>选填</small>':'')));
+      const val = el('button','nval','');
+      const sync = ()=>{
+        val.textContent = (f.optional && !s.on) ? '未填' : fmt(f,s.v)+' '+f.unit;
+        val.className = 'nval'+(s.touched && s.on ? ' on' : '');
+        val.style.setProperty('--off', (-s.v*8)+'px');
+        syncOk();
+      };
+      const mk = (label,d)=>{
+        const b = el('button','chip nbtn',label);
+        b.onclick = ()=>{ s.v = Math.min(f.max, Math.max(f.min, Math.round((s.v+d)*10)/10)); s.touched = true; s.on = true; sync() };
+        return b;
+      };
+      val.onclick = ()=>{
+        if(f.optional){ s.on = !s.on; s.touched = s.on }   // 选填：点数字 = 在「未填」与「已填」之间切换
+        else { s.touched = true }
+        sync();
+      };
+      row.appendChild(mk('−'+f.s2,-f.s2)); row.appendChild(mk('−'+f.s1,-f.s1));
+      row.appendChild(val);
+      row.appendChild(mk('+'+f.s1,f.s1)); row.appendChild(mk('+'+f.s2,f.s2));
+      wrap.appendChild(row); refresh.push(sync);
+    });
+    refresh.forEach(fn=>fn());
     const act = el('div','sact');
-    ok.onclick = ()=>{ add('user', fmt(v)+' '+o.unit); clearTray(); res(v) };
+    ok.onclick = ()=>{
+      const out = {}; const parts = [];
+      fields.forEach(f=>{
+        const s = S[f.k];
+        if(f.optional && !s.on){ out[f.k] = null; return }
+        out[f.k] = s.v; parts.push((f.optional?f.label+' ':'')+fmt(f,s.v)+' '+f.unit);
+      });
+      add('user', parts.join(' · ')); clearTray(); res(out);
+    };
     act.appendChild(ok);
-    if(o.skip){ const sk=el('button','chip ghost','跳过'); sk.onclick=()=>{add('user','跳过');clearTray();res(null)}; act.appendChild(sk); }
     if(o.back) backBtn(act,res);
     wrap.appendChild(act);
     tray.appendChild(wrap); toBottom();
@@ -1056,56 +1227,15 @@ async function showResult(my){
     else if(c==='r'){ clearSaved(); start(); return }
   }
 }
-/* 問卷步驟：每一步 {k 存進 A 的欄位, ask(A,back) 問題, react(v,A) 答完後的一句回應（可省略）}。
+/* 問卷內容（問什麼、選項、回應）在 questions.js；這裡只負責畫出來。
    「改上一題」：把這一題與上一題在聊天裡留下的泡泡一起移除，重新問上一題。 */
-const INTRO_HINT = '一共 14 个小问题，选错了可以点「改上一题」。所有数据只在你的手机上计算，不会上传。';
-const REACT_GOAL = {
-  fat:'好，目标减脂。我会按温和的节奏算，不会让你吃得太少。',
-  muscle:'好，目标增肌塑形。我会把蛋白质和训练量排得足一些。',
-  shape:'好，想改善体态、紧致线条。力量训练会是重点。',
-  keep:'好，保持健康。我们按稳定、能长期坚持来排。'
-};
-const STEPS = [
-  {k:'goal', ask:(A,bk)=>pick('先说说你最想达成什么？',[
-     {label:'减脂',sub:'把体脂降下来，同时尽量保住肌肉',value:'fat'},
-     {label:'增肌塑形',sub:'练出线条，让身体更有力量',value:'muscle'},
-     {label:'改善体态、紧致',sub:'肩背更挺，整个人更紧致',value:'shape'},
-     {label:'保持健康',sub:'不追求变化，把现在的状态稳住',value:'keep'}],{back:bk}),
-   react:v=>REACT_GOAL[v]},
-  {k:'age', ask:(A,bk)=>num('你今年多大了？点 − ＋ 调到你的年龄',{min:14,max:75,unit:'岁',def:30,s1:1,s2:5,back:bk})},
-  {k:'height', ask:(A,bk)=>num('身高多少？点 − ＋ 调整',{min:130,max:200,unit:'cm',def:160,s1:1,s2:5,back:bk})},
-  {k:'weight', ask:(A,bk)=>num('现在体重多少？点 − ＋ 调到你的数字（早上空腹最准）',{min:30,max:150,unit:'kg',def:55,s1:0.5,s2:5,back:bk})},
-  {k:'waist', ask:(A,bk)=>num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',def:70,s1:1,s2:5,skip:true,back:bk})},
-  {k:'exp', ask:(A,bk)=>pick('你现在的运动基础是？',[
-     {label:'零基础',sub:'几乎没系统运动过',value:'new'},
-     {label:'偶尔运动',sub:'有空才动一动，没有固定节奏',value:'some'},
-     {label:'规律训练过',sub:'已经有固定的训练习惯',value:'reg'}],{back:bk}),
-   react:v=>v==='new' ? '没关系，从零开始最稳，动作和组数我会先排得轻松一点。' : v==='reg' ? '好，那训练量我会排得足一点。' : null},
-  {k:'days', ask:(A,bk)=>pick('每周打算练几天？先选你能坚持的，不是最理想的。',[
-     {label:'2 天',value:2},{label:'3 天',value:3,rec:A.exp!=='reg'},{label:'4 天',value:4,rec:A.exp==='reg'},{label:'5 天',value:5}],{back:bk})},
-  {k:'mins', ask:(A,bk)=>pick('每次大概能练多久？',[
-     {label:'30 分钟',value:30,rec:A.exp==='new'},{label:'45 分钟',value:45,rec:A.exp!=='new'},{label:'60 分钟',value:60}],{back:bk})},
-  {k:'place', ask:(A,bk)=>pick('主要在哪里练？',[
-     {label:'健身房',sub:'有器械可以用',value:'gym'},
-     {label:'家里有哑铃/弹力带',sub:'在家练，有一点器材',value:'home'},
-     {label:'家里徒手',sub:'什么器材都没有',value:'body'}],{back:bk})},
-  {k:'focus', ask:(A,bk)=>multi('有没有特别想重点改善的部位？（可多选，选完点确定；不选就按整体来）',[
-     {label:'臀腿线条',value:'hips'},{label:'腰腹',value:'abs'},{label:'手臂',value:'arms'},{label:'背部体态',value:'posture'},{label:'没有特别想要的',value:'none'}],'none',{back:bk}),
-   react:v=>v.indexOf('none')<0 ? '好，每个训练日我会加一小段「重点加练」。' : null},
-  {k:'injury', ask:(A,bk)=>multi('有没有哪些部位不舒服或受过伤？（可多选）',[
-     {label:'膝盖',value:'k'},{label:'腰背',value:'b'},{label:'肩颈',value:'s'},{label:'都没有',value:'none'}],'none',{back:bk}),
-   react:v=>v.indexOf('none')<0 ? '收到，这些部位我会避开压力大的动作。' : null},
-  {k:'health', ask:(A,bk)=>multi('下面这些情况有没有？这类情况我会更保守，所以先问一下。没有就选「都没有」。',[
-     {label:'怀孕或哺乳期',value:'preg'},{label:'有慢性病或在服药',value:'chronic'},{label:'都没有',value:'none'}],'none',{back:bk}),
-   react:v=>v.indexOf('none')<0 ? '好，我会更保守：只给维持体重的参考，不做热量缺口。开始训练前也请先问过医生。' : null},
-  {k:'diet', ask:(A,bk)=>multi('饮食上有什么忌口？（可多选）',[
-     {label:'吃蛋奶素',value:'veg'},{label:'乳糖不耐',value:'lactose'},{label:'海鲜过敏',value:'seafood'},{label:'没有忌口',value:'none'}],'none',{back:bk}),
-   react:v=>v.indexOf('none')<0 ? '收到，菜单会避开这些。' : null},
-  {k:'eat', ask:(A,bk)=>pick('平时吃饭主要是？',[
-     {label:'外食为主',sub:'食堂、外卖、餐厅',value:'out'},
-     {label:'自己做饭',sub:'食材自己买，自己做',value:'cook'},
-     {label:'两种都有',sub:'有时自己做，有时在外面吃',value:'mix'}],{back:bk})}
-];
+function askStep(st,bk){
+  const q = typeof st.q==='function' ? st.q(A) : st.q;
+  if(st.type==='nums') return nums(q, st.fields, {back:bk});
+  const opts = st.opts(A);
+  if(st.type==='multi') return multi(q, opts, 'none', {back:bk, rows:st.rows});
+  return pick(q, opts, {back:bk, rows:st.rows});
+}
 const rowCount = () => chat.querySelectorAll('.row').length;
 const dropRowsFrom = n => [].slice.call(chat.querySelectorAll('.row')).slice(n).forEach(r=>r.remove());
 
@@ -1124,11 +1254,12 @@ async function flow(my){
   while(i<STEPS.length){
     if(my!==runId) return;
     const st=STEPS[i]; marks[i]=rowCount(); setProg(i);
-    const v = await st.ask(A, i>0);
+    lastOpt = null;
+    const v = await askStep(st, i>0);
     if(my!==runId) return;
     if(v===BACK){ dropRowsFrom(marks[i]); i--; dropRowsFrom(marks[i]); continue }
-    A[st.k]=v;
-    const t = st.react ? st.react(v,A) : null;
+    st.set(A,v);
+    const t = st.react ? st.react(v,A,lastOpt) : null;
     if(t) await say(t);
     i++;
   }
