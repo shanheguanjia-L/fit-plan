@@ -586,13 +586,26 @@ const HEALTH_SRC = {
   nhsBack:{n:'NHS：Back pain（背痛）',u:'https://www.nhs.uk/conditions/back-pain/',d:'页面审阅于 2026-03-05'},
   nhsKnee:{n:'NHS：Knee pain（膝盖痛）',u:'https://www.nhs.uk/conditions/knee-pain/',d:'页面审阅于 2023-12-21'},
   nhsShoulder:{n:'NHS：Shoulder pain（肩痛）',u:'https://www.nhs.uk/conditions/shoulder-pain/',d:'页面审阅于 2023-05-22'},
+  who2020:{n:'WHO 2020 身体活动与久坐行为指南（Bull FC 等，Br J Sports Med 2020）',u:'https://doi.org/10.1136/bjsports-2020-102955',d:'期刊论文，2020-12'},
+  cn2021:{n:'中国人群身体活动指南（2021）（Biomed Environ Sci 2022;35(1):1-3）',u:'https://www.besjournal.com/fileSWYXYHJKX/journal/article/swyxyhjkx/2022/1/PDF/21476.pdf',d:'国家卫生健康委疾控局指导、中国疾控中心等牵头，2022 年刊载'},
+  acsm2015:{n:'美国运动医学会（ACSM）运动前健康筛查建议更新（Riebe D 等，Med Sci Sports Exerc 2015）',u:'https://doi.org/10.1249/MSS.0000000000000664',d:'期刊论文，2015-11'},
+  acog804:{n:'美国妇产科医师学会（ACOG）第 804 号委员会意见：孕期与产后的身体活动和运动',u:'https://www.acog.org/clinical/clinical-guidance/committee-opinion/articles/2020/04/physical-activity-and-exercise-during-pregnancy-and-the-postpartum-period',d:'2020-04 发布，2023 年重新确认'},
+  parq:{n:'PAR-Q+ 运动前健康问卷（加拿大 PAR-Q+ 合作组织，英文官方表格）',u:'https://eparmedx.com/wp-content/uploads/2025/01/PARQPlus2025Fillable.pdf',d:'2025 版，取用于 2026-11-25'},
+  nhsChest:{n:'NHS：Chest pain（胸痛）',u:'https://www.nhs.uk/conditions/chest-pain/',d:'页面审阅于 2023-08-08'},
   nhsNeck:{n:'NHS：Neck pain（颈痛）',u:'https://www.nhs.uk/conditions/neck-pain/',d:'页面审阅于 2023-04-27（原定 2026-04-27 复审，取用时尚未更新）'}
 };
 
-const HEALTH_NOTE = '这些资料来自英国 NHS 和 WHO，只是一般性信息，不是诊断，也不一定完全适用于你所在的地区。身体有不舒服，请以医生的意见为准。';
+const HEALTH_NOTE = '这些资料来自 WHO、英国 NHS、中国身体活动指南等权威机构，只是一般性信息，不是诊断，也不一定完全适用于你所在的地区。身体有不舒服，请以医生的意见为准。';
 
 // 知识主题：title 标题；pts 要点（每条一句）；src 来源（HEALTH_SRC 的键）
 const HEALTH_TOPICS = [
+  {id:'guides',title:'权威指南怎么说（WHO 与中国）',src:['who2020','cn2021'],pts:[
+    'WHO 2020 与中国 2021 指南都建议：18–64 岁成年人每周 150–300 分钟中等强度有氧运动，或 75–150 分钟高强度，或两者相当的组合。',
+    '两份指南都建议：每周至少 2 天做肌肉力量练习。',
+    'WHO：做一点比不做好，做得多更好；各年龄段都应减少久坐。中国指南：动则有益、多动更好、适度量力、贵在坚持。',
+    '中国指南：65 岁以上同样适用成人建议，还要坚持平衡、灵敏和柔韧练习；做不到每周 150 分钟中等强度时，尽量提高各种身体活动的水平。',
+    '中国指南：慢性病患者运动前应先咨询医生，并在专业人员指导下进行。',
+    'WHO 2020 首次为孕产期女性和慢性病、残障人士订了专门建议。']},
   {id:'activity',title:'一周运动量',src:['nhsPA','who'],pts:[
     '成年人每周至少做 150 分钟中等强度的运动，或 75 分钟高强度的运动。',
     '每周至少有 2 天做力量训练，要练到腿、髋、背、腹、胸、肩、手臂这些主要肌群。',
@@ -934,6 +947,9 @@ function validSaved(A){
   if(!isStrArr(A.injury) || !isStrArr(A.health) || !isStrArr(A.diet)) return false;
   if(A.focus!==undefined && !isStrArr(A.focus)) return false;
   if(A.eat!==undefined && typeof A.eat!=='string') return false;
+  if(A.nonum!==undefined && typeof A.nonum!=='boolean') return false;
+  if(A.scr!==undefined && A.scr!=='ok' && A.scr!=='stop') return false;
+  if(A.screen!==undefined && !isStrArr(A.screen)) return false;
   if(A.sw!==undefined){
     if(!A.sw || typeof A.sw!=='object' || Array.isArray(A.sw)) return false;
     for(const k in A.sw){ if(!/^\d+-\d+$/.test(k) || typeof A.sw[k]!=='string' || !has(EXM,A.sw[k])) return false }
@@ -948,7 +964,50 @@ function validSaved(A){
    沒有任何使用者自由輸入的文字。若日後加入自由輸入，必須先做 HTML 跳脫。 */
 
 const F = x=>x.toFixed(1);
+/* ---------- 「不看數字」模式（A.nonum）：不顯示熱量、克數、BMI 等數字，飲食改用手掌、拳頭表示份量 ---------- */
+function summaryCardNoNum(A,C){
+  let w='';
+  if(C.low && (A.goal==='fat'||A.goal==='shape')) w+='<div class="warn">按你的身高体重，不建议再减重，所以饮食会按「维持」来安排，重点放在力量训练和吃够蛋白质。</div>';
+  return '<div class="card sum"><h3>你的专属方案</h3>'+
+  '<div class="muted">目标：'+GOAL[A.goal]+' · 每周练 '+A.days+' 次 · 每次约 '+A.mins+' 分钟</div>'+w+
+  '<ul class="t"><li>饮食：按份量吃，七分饱就停；每餐有一份蛋白质、一份主食、两份以上蔬菜。</li><li>训练：按「训练计划」做，量力而行，不舒服就停。</li></ul>'+
+  '<div class="muted">你选择了不看数字，所以这里不显示热量和克数。想改，可以点「重新开始」。</div></div>';
+}
+// 份量：蛋白質 1 掌 ≈ 25 g 蛋白質、主食 1 拳 ≈ 28 g 碳水（本頁沿用的估算）；水果、蛋、麵包按個數；飲品按杯（≈250 g）
+const DRINKS = ['无糖豆浆（低脂）','全脂牛奶','脱脂牛奶','原味低脂酸奶','希腊酸奶（脱脂、原味）'];
+const half05 = x => Math.max(0.5, Math.round(x*2)/2);
+function handQty(it){
+  const f=FM[it.n], name=it.n.replace(/（.*）/,'');
+  if(UW[it.n] && f.u) return name+' '+half05(it.g/f.u)+' '+UW[it.n];
+  if(it.n==='橄榄油') return '用油约 1 茶匙';
+  if(f.c==='坚果与油脂') return name+' 一小把';
+  if(f.c==='水果') return name+' 一份';
+  if(DRINKS.indexOf(it.n)>=0) return name+' 约 '+half05(it.g/250)+' 杯';
+  if(it.st) return name+' 约 '+half05(f.cb*it.g/100/28)+' 拳';
+  if(it.pr) return name+' 约 '+half05(f.p*it.g/100/25)+' 掌';
+  return name;
+}
+function menuCardNoNum(A,C){
+  const M = menu(A,C);
+  let h = '<div class="card"><h3>7 天饮食示例</h3><div class="muted">按份量吃：1 掌 ≈ 手掌大小和厚度的肉、蛋、豆制品；1 拳 ≈ 一个拳头大小的熟主食；蔬菜每餐两拳以上；吃到七分饱就停。点每一天展开。</div>'+
+  M.map(function(d,i){
+    return '<details class="dd"'+(i===0?' open':'')+'><summary>'+d.day+'</summary>'+
+    d.meals.map(function(m){
+      const veg=m.items.filter(function(it){ return FM[it.n].c==='蔬菜' }).map(function(it){ return it.n.replace(/（.*）/,'') });
+      const rest=m.items.filter(function(it){ return FM[it.n].c!=='蔬菜' }).map(handQty);
+      return '<div class="meal"><b>'+m.name+'</b><br>'+rest.join('、')+(veg.length?'<br>蔬菜（'+veg.join('、')+'）两拳以上':'')+'<br><small>'+m.hint+'</small></div>';
+    }).join('')+'</details>';
+  }).join('');
+  const avgP=M.reduce(function(s,d){ return s+d.total.p },0)/M.length;
+  if(avgP<C.p*PROTEIN_NOTE_RATIO) h += '<div class="warn">这份菜单的蛋白质比建议的少一些。吃得下的话，可以多加蛋、豆制品或无糖酸奶，也可以请营养师帮你调整。</div>';
+  if(A.eat!=='cook'){
+    h += '<div class="day"><h4><span>外食</span>怎么点</h4><ul class="t"><li>选清蒸、水煮、炖、烤，少选油炸、勾芡和浓汤。</li><li>主食点小份，酱汁分开放。</li><li>麻辣烫选清汤，多放蔬菜和肉类，少放芝麻酱。</li><li>便利店：茶叶蛋、无糖豆浆、即食鸡胸肉、玉米、沙拉都是可以的。</li></ul></div>';
+  }
+  return h+'<div class="muted" style="margin-top:8px">份量是估算，按自己的饱足感调整。</div></div>';
+}
+
 function summaryCard(A,C){
+  if(A.nonum) return summaryCardNoNum(A,C);
   let w='';
   if(C.flagged) w+='<div class="warn">你勾选了怀孕/哺乳、慢性病或年龄未满 18 岁。这种情况我只给「维持体重」的参考，不做热量缺口。开始训练或调整饮食前，请先问过医生。</div>';
   if(C.low && !C.flagged && (A.goal==='fat'||A.goal==='shape')) w+='<div class="warn">你的 BMI 偏低（'+F(C.bmi)+'），不建议再减重，所以热量按维持来算，重点放在力量训练和吃够蛋白质。</div>';
@@ -1049,6 +1108,7 @@ function workoutCard(A){
 
 /* ---------- 飲食計劃 ---------- */
 function menuCard(A,C){
+  if(A.nonum) return menuCardNoNum(A,C);
   const M = menu(A,C);
   let h = '<div class="card"><h3>7 天饮食示例</h3><div class="muted">每日目标约 '+C.kcal+' kcal，蛋白质 '+C.p+' g。克数按你的目标反推，是煮熟后的重量（水果、坚果除外），用厨房秤或对照手掌估一下就行，吃到七分饱。点每一天展开。</div>'+
   M.map(function(d,i){
@@ -1099,14 +1159,14 @@ function exLibCard(scope,A){
 const FOOD_TAG = {m:'肉',s:'海鲜',e:'蛋',d:'含乳糖'};
 function foodLibCard(A){
   const cats=[]; FOODS.forEach(function(f){ if(cats.indexOf(f.c)<0) cats.push(f.c) });
-  let h='<div class="card"><h3>食物库（'+FOODS.length+' 种）</h3><div class="muted">每 100 克的营养。带「含乳糖」「海鲜」「肉」标记的，和你的忌口有冲突时会提醒。数据来自美国农业部 FoodData Central。</div>';
+  let h='<div class="card"><h3>食物库（'+FOODS.length+' 种）</h3><div class="muted">'+(A.nonum?'按类别看能吃什么、怎么吃。':'每 100 克的营养。')+'带「含乳糖」「海鲜」「肉」标记的，和你的忌口有冲突时会提醒。数据来自美国农业部 FoodData Central。</div>';
   cats.forEach(function(c,ci){
     h += '<details class="dd"'+(ci===0?' open':'')+'><summary>'+c+'</summary>';
     FOODS.filter(function(f){ return f.c===c }).forEach(function(f){
       const bad = !allowed(f,A);
       h += '<div class="meal"'+(bad?' style="opacity:.5"':'')+'><b>'+f.n+'</b> '+(f.t?'<small style="color:var(--warn)">'+FOOD_TAG[f.t]+(bad?'（你的忌口，不推荐）':'')+'</small>':'')+
-        '<br><small>热量 '+f.k+' kcal · 蛋白质 '+f.p.toFixed(1)+' g · 碳水 '+f.cb.toFixed(1)+' g · 脂肪 '+f.f.toFixed(1)+' g</small>'+
-        (f.us?'<br><small>份量：'+f.us+'</small>':'')+(f.ck?'<br><small>吃法：'+f.ck+'</small>':'')+'</div>';
+        (A.nonum?'':'<br><small>热量 '+f.k+' kcal · 蛋白质 '+f.p.toFixed(1)+' g · 碳水 '+f.cb.toFixed(1)+' g · 脂肪 '+f.f.toFixed(1)+' g</small>')+
+        (f.us&&!A.nonum?'<br><small>份量：'+f.us+'</small>':'')+(f.ck?'<br><small>吃法：'+f.ck+'</small>':'')+'</div>';
     });
     h += '</details>';
   });
@@ -1124,7 +1184,7 @@ function tipsCard(A,C){
   '<li><b>复盘：</b>坚持 2–3 周后，用新的体重和感受再来算一次，计划也会跟着更新。</li></ul></div>';
 }
 function planText(A,C){
-  let t='【我的健身计划】\n目标：'+GOAL[A.goal]+'\n每日建议摄入 '+C.kcal+' kcal（蛋白质 '+C.p+'g / 碳水 '+C.c+'g / 脂肪 '+C.f+'g）\n\n训练安排：\n';
+  let t='【我的健身计划】\n目标：'+GOAL[A.goal]+'\n'+(A.nonum?'饮食：按份量吃，七分饱\n':'每日建议摄入 '+C.kcal+' kcal（蛋白质 '+C.p+'g / 碳水 '+C.c+'g / 脂肪 '+C.f+'g）\n')+'\n训练安排：\n';
   workout(A).forEach(d=>{ t+=d.day+' '+d.title+'：'+(d.cardio?'有氧 30–40 分钟 + 拉伸':d.ex.join('、'))+'\n' });
   return t+'\n（公式估算，非医学建议）';
 }
@@ -1229,6 +1289,43 @@ function chartSvg(points,dec){
   return s+'</svg>';
 }
 
+/* ---------- 安全篩檢後的轉介卡片 ----------
+   保守版原則：本頁只負責「拒絕與轉介」，不做醫療判斷。任何一項篩檢符合，就不給訓練計劃與熱量目標。
+   reasons：篩檢結果代碼（見 questions.js 的 screen 步驟）；另有 young（未滿 18）、old（65 歲以上）。 */
+const SCREEN_MED = ['heart','chest','faint','chronic','msk','supervised'];
+const SCREEN_PREG = ['preg','bf','post'];
+function referralCard(reasons){
+  const has=c=>reasons.indexOf(c)>=0, any=L=>L.some(has);
+  let h='<div class="card"><h3>这次先不给你训练和饮食计划</h3><div class="muted">不是你做错了什么，是本页的设计比较保守：只适合 18–64 岁、目前没有心脏、慢性病、骨关节问题，也不在孕产期的成年人自己练。下面是建议的下一步。</div>';
+  if(any(SCREEN_MED)){
+    h+='<div class="day"><h4><span>先问</span>医生</h4><ul class="t">'+
+      '<li>请先问医生：你现在能不能运动、适合怎样的强度和动作。中国身体活动指南也建议，慢性病患者运动前先咨询医生，并在专业人员指导下进行。</li>'+
+      '<li>美国运动医学会的建议是：运动前要看是否有症状，或已知的心血管、代谢、肾脏疾病。这类情况请先由医生评估。</li>'+
+      '<li>医生同意之后，你仍然可以看本页的「健康知识」，但具体计划请跟医生或康复治疗师一起定。</li></ul></div>';
+  }
+  if(has('chest')){
+    h+='<div class="warn">如果胸口突然疼痛或不适、一直不消失，或者痛到手臂、颈部、下巴、胃部或背部，或者胸痛同时出汗、恶心、头晕、喘不过气，请立即打急救电话。（NHS 胸痛页面）</div>';
+  }
+  if(any(SCREEN_PREG)){
+    h+='<div class="day"><h4><span>孕产</span>先评估</h4><ul class="t">'+
+      '<li>美国妇产科医师学会认为：没有产科或医疗并发症时，孕期运动是安全且有益的；产后也鼓励运动。但要先由产科医生或助产士评估你的情况。</li>'+
+      '<li>WHO 2020 指南有专门给孕产期女性的建议，本页还没有这部分内容，所以不给你一般的计划。</li>'+
+      '<li>「健康知识」里有 NHS 的孕期与产后资料，可以先看看，再跟医生讨论。</li></ul></div>';
+  }
+  if(has('ill')){
+    h+='<div class="day"><h4><span>先养</span>好身体</h4><ul class="t"><li>正在感冒、发烧或身体不舒服时，先休息，等好了再开始。（PAR-Q+ 问卷也建议暂时生病时延后增加运动。）</li></ul></div>';
+  }
+  if(has('young')){
+    h+='<div class="day"><h4><span>未满</span>18 岁</h4><ul class="t"><li>本页是按 18–64 岁成年人设计的。WHO 和中国指南对 6–17 岁另有建议：每天平均至少 60 分钟中等到高强度活动，中国指南还建议每周至少 3 天做肌肉和骨骼强化练习。</li><li>建议在家长、老师或教练指导下运动。</li></ul></div>';
+  }
+  if(has('old')){
+    h+='<div class="day"><h4><span>65 岁</span>以上</h4><ul class="t"><li>中国指南建议：65 岁以上除了成人的建议，还要坚持平衡、灵敏和柔韧练习。本页还没有这部分内容。</li><li>建议请康复治疗师或有经验的教练帮你安排，尤其是平衡练习。</li></ul></div>';
+  }
+  h+='<div class="muted hsrc">说明：本页的安全问题是自己编写的，不是经过验证的筛检工具。想用国际通用的版本，可以看加拿大 PAR-Q+ 官方表格（英文）。</div>';
+  const keys=['cn2021','acsm2015','who2020'].concat(any(SCREEN_PREG)?['acog804']:[]).concat(has('chest')?['nhsChest']:[]).concat(['parq']);
+  return h+srcHtml(keys)+'</div>';
+}
+
 /* ---------- 卡片 HTML ---------- */
 function srcHtml(keys){
   return '<div class="muted hsrc">来源：'+keys.map(function(k){
@@ -1312,7 +1409,8 @@ function logText(L){
 </script>
 <script>
 /* ==== src/js/questions.js ==== */
-/* 問卷：問什麼、有哪些選項、答完怎麼回應、答案怎麼寫進 A。純資料與純函式，不碰 DOM（Node 測試可直接驗證所有題目）。
+/* 問卷：問什麼、有哪些選項、答完怎麼回應、答案怎麼寫進 A。
+   need(A)：這一題是後來新增的；舊存檔缺這一題時，「繼續上次的」只補問這幾題，其他資料保留。純資料與純函式，不碰 DOM（Node 測試可直接驗證所有題目）。
    app.js 負責把這些步驟畫成聊天、處理「改上一題」。
    設計原則（行為引導）：
    - 少問：年齡、身高、體重合成一張卡；每週幾天與每次多久合成「你能留出多少時間」一題（共 10 題，原本 14 題）。
@@ -1334,7 +1432,29 @@ const REACT_GOAL = {
 };
 const has2 = (v,x) => v.indexOf(x)>=0;
 
+const AGE_MIN = 18, AGE_MAX = 64;      // 中國身體活動指南與 WHO 的「成年人」分組是 18–64 歲；超出就轉介
 const STEPS = [
+  // 0 安全篩檢（保守版）：任何一項符合就不給計劃，只轉介。題目是本頁自己寫的，不是 PAR-Q+（PAR-Q+ 不允許修改或節錄）。
+  {k:'screen', type:'multi', rows:true,
+   q:'开始之前，先确认你适合用本页自己练。下面这些情况，有符合的吗？（可多选）',
+   opts:()=>[
+     {header:'身体状况'},
+     {label:'医生说过我有心脏方面的问题，或高血压',value:'heart'},
+     {label:'休息、日常活动或运动时，会胸口痛或胸闷',value:'chest'},
+     {label:'最近一年，因为头晕站不稳，或晕倒过',value:'faint'},
+     {label:'有其他长期疾病（例如糖尿病、哮喘、肾病），或正在长期吃药',value:'chronic'},
+     {label:'骨头、关节或肌肉有问题，医生说过要限制运动，或一运动就明显加重',value:'msk'},
+     {label:'医生说过我只能在医护人员看着时运动',value:'supervised'},
+     {label:'现在正在感冒、发烧，或身体不舒服',value:'ill'},
+     {header:'孕产'},
+     {label:'怀孕中',value:'preg'},
+     {label:'哺乳期',value:'bf'},
+     {label:'产后一年内',value:'post'},
+     {header:' '},
+     {label:'以上都没有',value:'none'}],
+   set:(A,v)=>{ A.scr = has2(v,'none') ? 'ok' : 'stop'; A.screen = v; A.health = ['none'] },
+   need:(A)=> A.scr!=='ok',            // 舊存檔沒做過安全篩檢：繼續上次時要補答
+   gate:(A,v)=> has2(v,'none') ? null : v.slice() },
   // 1 身体数据：一张卡四行，不一题一题地问
   {k:'body', type:'nums',
    q:'先认识一下你。年龄、身高、体重大概是多少？点 − ＋ 调到你的数字（点数字也算确认），腰围可以不填。',
@@ -1344,7 +1464,8 @@ const STEPS = [
      {k:'weight',label:'体重',unit:'kg',min:30,max:150,def:55,s1:0.5,s2:5},
      {k:'waist',label:'腰围',unit:'cm',min:50,max:140,def:70,s1:1,s2:5,optional:true}],
    set:(A,v)=>{ A.age=v.age; A.height=v.height; A.weight=v.weight; A.waist=v.waist },
-   react:(v)=>{ const b=bmiOf(v.height,v.weight); return b<BMI_LOW ? '你的 BMI 是 '+b.toFixed(1)+'，偏低。之后我不会给你安排热量缺口。' : null }},
+   react:(v)=>{ if(v.age<AGE_MIN || v.age>AGE_MAX) return null; const b=bmiOf(v.height,v.weight); return b<BMI_LOW ? '你的 BMI 是 '+b.toFixed(1)+'，偏低。之后我不会给你安排热量缺口。' : null },
+   gate:(A,v)=> v.age<AGE_MIN ? ['young'] : v.age>AGE_MAX ? ['old'] : null},
   // 2 目标
   {k:'goal', type:'pick',
    q:'你最想改变什么？',
@@ -1429,15 +1550,6 @@ const STEPS = [
      {label:'都没有',value:'none'}],
    set:(A,v)=>{ A.injury=v },
    react:(v)=> !has2(v,'none') ? '收到，这些部位我会避开压力大的动作。' : null },
-  // 8 健康狀況
-  {k:'health', type:'multi', rows:true,
-   q:'下面这些情况有没有？有的话我会更保守。',
-   opts:()=>[
-     {label:'怀孕或哺乳期',sub:'只给维持体重的参考，不做热量缺口',value:'preg'},
-     {label:'有慢性病，或正在吃药',sub:'同样更保守，并建议先问过医生',value:'chronic'},
-     {label:'都没有',value:'none'}],
-   set:(A,v)=>{ A.health=v },
-   react:(v)=> !has2(v,'none') ? '好，我会更保守：只给维持体重的参考，不做热量缺口。开始训练前也请先问过医生。' : null },
   // 9 忌口
   {k:'diet', type:'multi', rows:true,
    q:'吃的方面，有没有不吃或不能吃的？（可多选）',
@@ -1457,9 +1569,17 @@ const STEPS = [
      {label:'外食为主',sub:'食堂、外卖、餐厅',value:'out'},
      {label:'自己做饭',sub:'食材自己买，自己做',value:'cook'},
      {label:'两种都有',sub:'有时自己做，有时在外面吃',value:'mix'}],
-   set:(A,v)=>{ A.eat=v }}
+   set:(A,v)=>{ A.eat=v }},
+  // 最後：要不要看熱量與克數（給曾有飲食失調、或對吃東西壓力很大的人一個不看數字的選擇）
+  {k:'nonum', type:'pick',
+   q:'最后一个：计划里要不要显示具体的热量和克数？',
+   opts:()=>[
+     {label:'要，越具体越好',sub:'显示每日热量、蛋白质、每餐克数',value:false},
+     {label:'不要，只看份量就好',sub:'用手掌、拳头表示份量。如果你曾经有饮食失调，或对吃东西压力很大，建议选这个，也建议找专业人士聊聊',value:true}],
+   set:(A,v)=>{ A.nonum=v },
+   need:(A)=> typeof A.nonum!=='boolean'}
 ];
-const INTRO_HINT = '一共 '+STEPS.length+' 个小问题，选错了可以点「改上一题」。所有数据只在你的手机上计算，不会上传。';
+const INTRO_HINT = '本页适合 18–64 岁、身体健康、不在孕产期的成年人自己练。一共 '+STEPS.length+' 个小问题，选错了可以点「改上一题」。所有数据只在你的手机上计算，不会上传。';
 </script>
 <script>
 /* ==== src/js/app.js ==== */
@@ -1635,6 +1755,16 @@ function copyText(t){
 }
 
 /* ================= 对话流程 ================= */
+/* ---------- 轉介之後：只能看健康知識或重新開始 ---------- */
+async function referralMenu(my){
+  while(true){
+    const x = await pick('',[{label:'看健康知识',value:'k'},{label:'重新开始',value:'r',cls:'ghost'}]);
+    if(my!==runId) return;
+    if(x==='k') await say(healthKnowledgeCard(),true);
+    else { start(); return }
+  }
+}
+
 /* ---------- 健康管理：知识库、记录与趋势、不适与运动调整 ---------- */
 async function healthFlow(my){
   while(true){
@@ -1642,7 +1772,7 @@ async function healthFlow(my){
       {label:'健康知识',sub:'运动量、久坐、睡眠、喝水、体重、经期、孕期与产后',value:'k'},
       {label:'健康记录与趋势',sub:'记体重、腰围、睡眠、饮水，看变化曲线',value:'l'},
       {label:'不适与运动调整',sub:'膝盖、腰背、肩颈不舒服时怎么办',value:'d'},
-      {label:'返回',value:'b',cls:'ghost'}]);
+      {label:'返回',value:'b',cls:'ghost'}].filter(o=>!(A.nonum && o.value==='l')));   // 選了「不看數字」就不顯示體重記錄
     if(my!==runId) return;
     if(x==='k') await say(healthKnowledgeCard(),true);
     else if(x==='d') await say(discomfortCard(A),true);
@@ -1721,6 +1851,28 @@ function askStep(st,bk){
 const rowCount = () => chat.querySelectorAll('.row').length;
 const dropRowsFrom = n => [].slice.call(chat.querySelectorAll('.row')).slice(n).forEach(r=>r.remove());
 
+/* 舊存檔補答：只問後來新增、這份存檔還沒答過的題目（questions.js 裡有 need 的步驟），其他資料保留。
+   補答時一樣會做安全篩檢與年齡門檻；不符就轉介、刪除存檔。 */
+async function supplement(my){
+  const refer = async reasons => { clearSaved(); setProg(PROG_TOTAL); await say(referralCard(reasons),true); await referralMenu(my); return false };
+  const body = STEPS.filter(s => s.k==='body')[0];
+  const ageStop = body.gate(A,{age:A.age});                       // 舊存檔的年齡可能不在 18–64，先擋，免得白答
+  if(ageStop) return refer(ageStop);
+  const need = STEPS.filter(st => st.need && st.need(A));
+  if(need.length) await say('问卷新增了 '+need.length+' 个问题，补答一下就好，其他资料不用重新填。');
+  for(const st of need){
+    lastOpt = null;
+    const v = await askStep(st,false);
+    if(my!==runId) return false;
+    st.set(A,v);
+    const t = st.react ? st.react(v,A,lastOpt) : null;
+    if(t) await say(t);
+    const stop = st.gate ? st.gate(A,v) : null;
+    if(stop) return refer(stop);
+  }
+  if(need.length) saveA();
+  return true;
+}
 async function flow(my){
   chat.querySelectorAll('.row').forEach(r=>r.remove()); clearTray(); A={}; setProg(0);
   let saved=loadSaved();
@@ -1728,7 +1880,7 @@ async function flow(my){
   await say('你好呀，我是健身小助手。回答几个小问题，我就能按你的身体情况，排出训练和饮食计划。');
   if(saved){
     const r = await pick('看到你上次已经做过一份计划，要继续用吗？',[{label:'继续上次的',value:'y'},{label:'重新来一份',value:'n'}]);
-    if(r==='y'){ A=saved; return showResult(my) }
+    if(r==='y'){ A=saved; if(await supplement(my)) return showResult(my); return }
   }
   await say(INTRO_HINT);
   const marks=[];
@@ -1743,6 +1895,8 @@ async function flow(my){
     st.set(A,v);
     const t = st.react ? st.react(v,A,lastOpt) : null;
     if(t) await say(t);
+    const stop = st.gate ? st.gate(A,v) : null;              // 保守版：篩檢或年齡不符就轉介，不給計劃
+    if(stop){ clearSaved(); setProg(PROG_TOTAL); await say(referralCard(stop),true); return referralMenu(my) }
     i++;
   }
   saveA();
