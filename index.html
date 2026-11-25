@@ -494,6 +494,7 @@ const FOODS = [
   {c:'肉禽',n:'鸡胸肉（熟）',k:165,p:31.0,cb:0.0,f:3.6,t:'m',u:0,us:'',ck:'水煮、香煎、少油清炒',fdc:171477},
   {c:'肉禽',n:'去皮鸡腿肉（烤熟）',k:155,p:24.2,cb:0.0,f:5.7,t:'m',u:0,us:'',ck:'烤、煮、少油焖',fdc:172376},
   {c:'肉禽',n:'瘦牛肉（烤熟）',k:162,p:30.1,cb:0.0,f:3.8,t:'m',u:0,us:'',ck:'少油快炒、炖',fdc:168649},
+  {c:'肉禽',n:'羊腿肉（瘦、烤熟）',k:191,p:28.3,cb:0.0,f:7.7,t:'m',u:0,us:'',ck:'烤、炖、少油快炒',fdc:174314},
   {c:'肉禽',n:'猪里脊（烤熟）',k:143,p:26.2,cb:0.0,f:3.5,t:'m',u:0,us:'',ck:'少油快炒、水煮',fdc:168250},
   {c:'水产',n:'三文鱼（烤熟）',k:206,p:22.1,cb:0.0,f:12.4,t:'s',u:0,us:'',ck:'香煎、烤',fdc:175168},
   {c:'水产',n:'鲈鱼（烤熟）',k:146,p:24.2,cb:0.0,f:4.7,t:'s',u:0,us:'',ck:'清蒸',fdc:171989},
@@ -680,11 +681,12 @@ function qty(n,g){
   return n+' '+g+' g';
 }
 function itemStats(it){ const f=FM[it.n]; return {k:f.k*it.g/100, p:f.p*it.g/100, c:f.cb*it.g/100, f:f.f*it.g/100} }
+const NOBEEF = ['瘦牛肉（烤熟）','羊腿肉（瘦、烤熟）'];   // 「不吃牛羊肉」要排除的食物
 function allowed(f,A){
   if(f.t==='d' && A.diet.indexOf('lactose')>=0) return false;
   if(f.t==='s' && A.diet.indexOf('seafood')>=0) return false;
   if((f.t==='m'||f.t==='s') && A.diet.indexOf('veg')>=0) return false;
-  if(A.diet.indexOf('nobeef')>=0 && f.n==='瘦牛肉（烤熟）') return false;   // 不吃牛羊肉（食物庫目前只有牛肉）
+  if(A.diet.indexOf('nobeef')>=0 && NOBEEF.indexOf(f.n)>=0) return false;   // 不吃牛羊肉
   if(A.diet.indexOf('nopork')>=0 && f.n==='猪里脊（烤熟）') return false;
   return true;
 }
