@@ -1,224 +1,405 @@
 <!DOCTYPE html>
+<!-- 此檔由 node tools/build.js 從 dev.html 與 src/ 產生，請勿直接修改。 -->
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
 <title>我的专属健身计划</title>
+<!-- 錯誤提示條的樣式內嵌在這裡：就算 style.css 載不到，提示條也看得見 -->
+<style>#err{display:none;background:#b00020;color:#fff;padding:8px 12px;font-size:13px;word-break:break-all}</style>
+<script>
+/* 必須最先執行：錯誤提示條（#err）與載入失敗偵測。
+   - 執行期錯誤：顯示「页面出错：訊息 (檔名:行號)」。
+   - 開發版 dev.html 用一般 <script src> 依序載入（不用 module）：js 檔載入失敗 → 記進 FIT_LOAD_FAILED，
+     app.js 看到就不啟動，並顯示「页面文件加载失败」；style.css 載入失敗 → 只顯示提示，問答照常可用。
+   - 正式版 index.html 已把所有檔案內嵌，不會有載入失敗，這段只負責顯示執行期錯誤。 */
+var FIT_LOAD_FAILED = [], fitErrMsg = '';
+function fitShowErr(msg){
+  fitErrMsg = msg;
+  var b=document.getElementById('err'); if(!b) return;   // #err 還沒解析到：等 DOMContentLoaded 再顯示
+  b.style.display='block'; b.textContent=msg;
+}
+document.addEventListener('DOMContentLoaded',function(){ if(fitErrMsg) fitShowErr(fitErrMsg) });
+function fitLoadFail(node){
+  var u=(node.getAttribute('src')||node.getAttribute('href')||'').split('?')[0];
+  if(node.tagName==='SCRIPT') FIT_LOAD_FAILED.push(u);
+  fitShowErr('页面文件加载失败（'+u+'），请检查网络后刷新页面。');
+}
+window.addEventListener('error',function(e){
+  if(FIT_LOAD_FAILED.length) return;  // 已有載入失敗提示時，後續連帶的錯誤不覆蓋它
+  var f=(e.filename||'').split('?')[0].split('/').pop();
+  fitShowErr('页面出错：'+(e.message||'未知')+' ('+(f?f+':':'')+(e.lineno||'?')+')');
+});
+</script>
 <style>
-:root{--bg:#f3f1ec;--ink:#24302a;--sub:#6b7770;--acc:#3f8a68;--acc2:#e8f3ed;--line:#e1ded6;--warn:#b4531f;--warnbg:#fdf0e6}
+/* ==== src/style.css ==== */
+/* 健身小助手樣式。
+   相容性：老版微信 X5/XWeb（Chromium 約 55–100）。不要用 :has()、dvh；版面靠頁面自然捲動，不要改成固定高度。
+   已知：flex 的 gap 在 Chromium 84 以前無效（只影響間距）。
+   設計：暖灰白底 + 深墨文字 + 單一珊瑚色強調。強調色只用在三處：主按鈕、最重要的一個數字（每日建議摄入）、頂部問答進度線。
+   間距落在 4px 格線上；字重只有 400 / 500；圓角依元件大小（按鈕 8、卡片/泡泡 16）。 */
+:root{
+  --bg:#f7f4ee;--card:#fdfbf7;--raise:#efe9df;
+  --ink:#1f1b16;--sub:#5e554a;--mut:#7b7266;
+  --line:rgba(31,27,22,.1);--tick:rgba(31,27,22,.3);
+  --acc:#c2492f;
+  --warn:#7a5412;--warnbg:#f6eedb;
+  --ease:cubic-bezier(.22,1,.36,1);
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:16px;line-height:1.55}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:22px;font-variant-numeric:tabular-nums}
+b,strong{font-weight:500}
 #app{max-width:560px;margin:0 auto;min-height:100vh;background:var(--bg)}
-header{padding:12px 16px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:5}
-header .av{width:36px;height:36px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-weight:600}
-header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12px}
-#chat{padding:14px 12px 40px}
-.row{display:flex;margin:10px 0;gap:8px;align-items:flex-start;animation:in .25s ease}
+
+/* 頁首：只有名稱，底部一條問答進度線 */
+header{position:sticky;top:0;z-index:5;padding:12px 16px;background:var(--card);border-bottom:1px solid var(--line)}
+header b{display:block;font-size:16px;line-height:24px}
+header small{display:block;color:var(--mut);font-size:12px;line-height:16px}
+#prog{position:absolute;left:0;right:0;bottom:-1px;height:2px}
+#prog i{display:block;width:0;height:2px;background:var(--acc);transition:width .4s var(--ease)}
+
+/* 對話 */
+#chat{padding:16px 16px 48px}
+.row{display:flex;margin:12px 0;animation:in .3s var(--ease)}
 .row.user{justify-content:flex-end}
-@keyframes in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
-.av2{width:32px;height:32px;border-radius:50%;background:var(--acc);color:#fff;display:grid;place-items:center;font-size:13px;flex:none}
-.bub{background:#fff;border-radius:4px 14px 14px 14px;padding:10px 13px;max-width:82%;box-shadow:0 1px 1px rgba(0,0,0,.04);word-break:break-word}
-.user .bub{background:var(--acc);color:#fff;border-radius:14px 4px 14px 14px}
+@keyframes in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.bub{max-width:85%;padding:12px 16px;background:var(--card);border:1px solid var(--line);border-radius:4px 16px 16px 16px;word-break:break-word}
+.user .bub{background:var(--ink);border-color:var(--ink);color:var(--bg);border-radius:16px 4px 16px 16px}
 .bub.wide{max-width:100%;width:100%}
-.row.bot:has(.wide) .av2{display:none}
-.typing span{display:inline-block;width:6px;height:6px;margin:0 2px;background:#b5bdb8;border-radius:50%;animation:b 1s infinite}
+.typing span{display:inline-block;width:6px;height:6px;margin:0 2px;background:var(--tick);border-radius:50%;animation:b 1s infinite}
 .typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
-@keyframes b{50%{transform:translateY(-4px);background:var(--acc)}}
-#tray{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;margin-top:12px}
+@keyframes b{50%{transform:translateY(-4px)}}
+
+/* 回答區 */
+#tray{margin-top:16px;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:16px}
 #tray:empty{display:none}
-#err{display:none;background:#b00020;color:#fff;padding:8px 12px;font-size:13px;word-break:break-all}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chip{border:1.5px solid var(--acc);color:var(--acc);background:#fff;border-radius:22px;padding:9px 16px;font-size:15px;cursor:pointer;font-family:inherit}
-.chip:active{background:var(--acc2)}
-.chip.on{background:var(--acc);color:#fff}
-.chip.go{background:var(--acc);color:#fff;font-weight:600}
-.chip.ghost{border-color:var(--line);color:var(--sub)}
+.chip{min-height:44px;padding:10px 16px;background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--ink);font-family:inherit;font-size:15px;line-height:22px;cursor:pointer;transition:background-color .15s var(--ease),border-color .15s var(--ease),color .15s var(--ease),transform .15s var(--ease)}
+.chip:active{background:var(--raise);transform:scale(.98)}
+.chip:focus-visible,.mini:focus-visible,.vlink a:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.chip.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.chip.go{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:500}
+.chip.ghost{background:transparent;color:var(--sub)}
+/* 有說明的選項：整列可點，標題 + 一行說明（不用 gap，老版微信也有間距） */
+.opts{display:block}
+.opt{display:block;width:100%;text-align:left;padding:12px 16px}
+.opt+.opt{margin-top:8px}
+.opt b{display:block;line-height:22px}
+.opt small{display:block;margin-top:2px;color:var(--mut);font-size:13px;line-height:20px}
+.opts .back{margin-top:8px;width:auto}
+.rec{display:inline-block;margin-left:8px;padding:0 4px;border:1px solid var(--line);border-radius:4px;color:var(--mut);font-size:11px;line-height:16px;font-weight:400;vertical-align:1px}
+.chip.ok0{flex:1;background:var(--card);border-color:var(--ink);color:var(--ink)}
+.sact .back{order:-1}
+
+/* 數字選擇：下方的刻度尺是這個頁面的簽名（量身體的尺），數字變動時刻度會跟著移動 */
 .stepper{display:flex;align-items:center;justify-content:space-between}
-.sdisp{flex:1;text-align:center;font-size:15px;color:var(--sub)}
-.sdisp b{font-size:28px;color:var(--ink)}
-.sbtn{padding:9px 0;width:48px;text-align:center;margin:0 2px;font-size:14px}
-.sact{display:flex;gap:8px;margin-top:12px}
+.sdisp{flex:1;position:relative;padding-bottom:20px;text-align:center;font-size:14px;color:var(--mut);
+  background-image:linear-gradient(90deg,var(--tick) 1px,transparent 1px),linear-gradient(90deg,var(--tick) 1px,transparent 1px);
+  background-size:8px 6px,40px 12px;background-repeat:repeat-x;background-position:var(--off,0) 100%,var(--off,0) 100%}
+.sdisp::after{content:"";position:absolute;left:50%;bottom:0;width:2px;height:16px;margin-left:-1px;background:var(--acc)}
+.sdisp b{font-size:32px;line-height:40px;color:var(--ink)}
+.sbtn{width:48px;margin:0 2px;padding:10px 0;text-align:center;font-size:14px}
+.sact{display:flex;gap:8px;margin-top:16px}
 .sact .go{flex:1}
-.numrow input{flex:1;font-size:20px;padding:9px 12px;border:1.5px solid var(--line);border-radius:12px;font-family:inherit;min-width:0}
-.numrow input:focus{outline:none;border-color:var(--acc)}
-.numrow .unit{color:var(--sub)}
-.card h3{margin:0 0 6px;font-size:16px}
-.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:8px 0}
-.kpi{background:var(--acc2);border-radius:10px;padding:8px 10px}
-.kpi small{color:var(--sub);display:block;font-size:12px}.kpi b{font-size:19px}
-.kpi.big{grid-column:1/-1}
-.warn{background:var(--warnbg);color:var(--warn);border-radius:10px;padding:9px 11px;margin:8px 0;font-size:14px}
-.day{border-top:1px dashed var(--line);padding:9px 0}.day:first-of-type{border-top:0}
-.day h4{margin:0 0 4px;font-size:15px}.day h4 span{color:var(--acc);margin-right:6px}
-.day ol{margin:0;padding-left:20px}.day li{margin:2px 0}.day li i{color:var(--sub);font-style:normal;font-size:13px}
-.meal{padding:5px 0}.meal b{color:var(--acc)}.meal small{color:var(--sub)}
-.muted{color:var(--sub);font-size:13px}
-.exr{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+
+/* 卡片 */
+.card h3{margin:0 0 8px;font-size:17px;line-height:24px;font-weight:500}
+.muted{color:var(--mut);font-size:13px;line-height:20px}
+.warn{margin:12px 0;padding:12px;background:var(--warnbg);border-radius:8px;color:var(--warn);font-size:14px;line-height:20px}
+
+/* 結果頁：一個大數字 + 三大營養素比例條，其餘是安靜的列表 */
+.sum h3{margin:0;font-size:13px;line-height:20px;color:var(--mut)}
+.big{margin:4px 0;line-height:56px}
+.big b{font-size:52px;letter-spacing:-.02em;color:var(--acc)}
+.big span{margin-left:4px;font-size:16px;color:var(--mut)}
+.mbar{display:flex;height:8px;margin:16px 0 8px;border-radius:4px;overflow:hidden;background:var(--raise)}
+.mbar i{display:block;height:100%}
+.m1{background:var(--acc)}.m2{background:var(--sub)}.m3{background:#cfc6b6}
+.mleg{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;line-height:20px;color:var(--sub)}
+.mleg s{display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:2px;text-decoration:none}
+.mleg b{color:var(--ink)}
+.rows{margin:16px 0 8px}
+.rows div{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-top:1px solid var(--line);font-size:14px}
+.rows span{color:var(--sub)}
+
+/* 訓練計劃：一週條（實心＝訓練日，外框＝有氧日） */
+.week{display:flex;margin:12px 0 4px}
+.wd{flex:1;margin:0 2px;padding:8px 0;border:1px solid var(--line);border-radius:8px;text-align:center;font-size:12px;line-height:16px;color:var(--mut)}
+.wd:first-child{margin-left:0}.wd:last-child{margin-right:0}
+.wd::after{content:attr(data-d)}
+.wd.on{background:var(--ink);border-color:var(--ink);color:var(--bg)}
+.wd.cd{border-color:var(--ink);color:var(--ink)}
+.day{padding:12px 0;border-top:1px solid var(--line)}
+.day h4{margin:0 0 8px;font-size:15px;line-height:22px;font-weight:500}
+.day h4 span{display:inline-block;min-width:40px;margin-right:8px;font-weight:400;color:var(--mut)}
+.day ol{margin:0;padding-left:20px}
+.day li{margin:4px 0}
+.day li i{color:var(--mut);font-style:normal;font-size:13px}
+.meal{padding:8px 0}
+.meal small{color:var(--sub);font-size:13px}
+
+/* 動作說明 */
+.exr{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
 .exb{flex:none}
-.mini{border:1px solid var(--acc);color:var(--acc);background:#fff;border-radius:12px;padding:2px 10px;font-size:12px;font-family:inherit}
-.xd{margin:3px 0 4px}.xd summary{color:var(--acc);font-size:13px;cursor:pointer}
-.imgs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
-.imgs img{max-width:100%;max-height:230px;height:auto;border-radius:6px;background:#fff}
-.vlink{margin:6px 0 2px}.vlink a{display:inline-block;border:1px solid var(--acc);color:var(--acc);background:#fff;border-radius:14px;padding:4px 12px;font-size:13px;text-decoration:none}
-.xb{background:var(--acc2);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:14px}
-ul.t{margin:6px 0;padding-left:20px}ul.t li{margin:4px 0}
-.dd{border-top:1px solid var(--line);padding:8px 0}
-.dd summary{font-weight:600;cursor:pointer;list-style:none;padding:2px 0}
-.dd summary::after{content:"＋";float:right;color:var(--acc)}
+.mini{padding:4px 12px;background:var(--card);border:1px solid var(--line);border-radius:6px;color:var(--sub);font-family:inherit;font-size:12px;line-height:16px;transition:background-color .15s var(--ease)}
+.mini:active{background:var(--raise)}
+.xd{margin:4px 0}
+.xd summary{color:var(--sub);font-size:13px;cursor:pointer}
+.xb{margin-top:8px;padding:12px;background:var(--raise);border-radius:8px;font-size:14px;line-height:22px}
+.imgs{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 4px}
+.imgs img{max-width:100%;max-height:230px;height:auto;border-radius:4px;background:#fff}
+.vlink{margin:8px 0 4px}
+.vlink a{display:inline-block;padding:4px 12px;background:var(--card);border:1px solid var(--line);border-radius:6px;color:var(--ink);font-size:13px;line-height:20px;text-decoration:none}
+ul.t{margin:8px 0;padding-left:20px}
+ul.t li{margin:4px 0}
+
+/* 可展開的每日菜單、食物分類 */
+.dd{padding:12px 0;border-top:1px solid var(--line)}
+.dd summary{padding:0;font-weight:500;cursor:pointer;list-style:none}
+.dd summary::after{content:"＋";float:right;color:var(--mut)}
 .dd[open] summary::after{content:"－"}
 .dd summary::-webkit-details-marker{display:none}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body>
 <div id="app">
-  <header><div class="av">练</div><div><b>健身小助手</b><small>回答几个问题，生成你的专属计划</small></div></header>
+  <header><div><b>健身小助手</b><small>回答几个问题，生成你的专属计划</small></div><div id="prog"><i></i></div></header>
   <div id="err"></div>
   <div id="chat"><div id="tray"></div></div>
   <noscript><p style="padding:16px">需要开启 JavaScript 才能使用。</p></noscript>
 </div>
 <script>
-const $ = s => document.querySelector(s);
-const chat = $('#chat'), tray = $('#tray');
-const sleep = ms => new Promise(r => setTimeout(r, ms));
-let A = {};
-let runId = 0;
+/* ==== src/js/data-exercises.js ==== */
+/* 動作資料（純資料，沒有邏輯；瀏覽器與 Node 測試共用）
+   載入順序：data-exercises.js → data-foods.js → logic.js → render.js → app.js（見 dev.html；正式版由 tools/build.js 依同順序內嵌）
+   以下 wger 來源與授權說明為原版註解，原樣保留。 */
 
-function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e}
-function toBottom(){ setTimeout(()=>{ const h=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight); window.scrollTo(0,h); },30) }
-function add(who, html, wide){
-  const row = el('div','row '+who);
-  if(who==='bot') row.appendChild(el('div','av2','练'));
-  row.appendChild(el('div','bub'+(wide?' wide':''), html));
-  chat.insertBefore(row, tray); toBottom(); return row;
-}
-async function say(html, wide){
-  const t = add('bot','<span class="typing"><span></span><span></span><span></span></span>');
-  await sleep(wide?500:350+Math.min(html.length*9,800));
-  t.remove(); add('bot',html,wide);
-}
-function clearTray(){tray.innerHTML=''}
+/* ================= 动作资料库 =================
+   来源：wger 工作与健身管理项目（https://wger.de），数据按 CC-BY-SA 授权。
+   中文名称和要点由本页根据 wger 的英文说明挑选并改写，作者逐条标注。
+   lv：0 徒手，1 家里有哑铃/弹力带，2 健身房。t：k 膝盖 b 腰背 s 肩颈（我按动作类型自行标注，非 wger 提供）。 */
 
-// 单选
-function pick(q, opts){
-  return new Promise(async res=>{
-    if(q) await say(q);
-    clearTray(); const box = el('div','chips');
-    opts.forEach(o=>{
-      const b = el('button','chip'+(o.cls?' '+o.cls:''), o.label);
-      b.onclick = ()=>{ add('user',o.label); clearTray(); res(o.value) };
-      box.appendChild(b);
-    });
-    tray.appendChild(box); toBottom();
-  });
-}
-// 多选；exclusive 表示与其他互斥的选项（如“没有”）
-function multi(q, opts, exclusive){
-  return new Promise(async res=>{
-    await say(q); clearTray();
-    const box = el('div','chips'); const sel = new Set();
-    const btns = opts.map(o=>{
-      const b = el('button','chip',o.label);
-      b.onclick = ()=>{
-        if(sel.has(o.value)){sel.delete(o.value)}
-        else{
-          if(o.value===exclusive){sel.clear()} else {sel.delete(exclusive)}
-          sel.add(o.value);
-        }
-        btns.forEach((x,i)=>x.classList.toggle('on', sel.has(opts[i].value)));
-      };
-      box.appendChild(b); return b;
-    });
-    const ok = el('button','chip go','确定');
-    ok.onclick = ()=>{
-      if(!sel.size){ sel.add(exclusive) }
-      const labels = opts.filter(o=>sel.has(o.value)).map(o=>o.label).join('、');
-      add('user',labels); clearTray(); res([...sel]);
-    };
-    box.appendChild(ok); tray.appendChild(box); toBottom();
-  });
-}
-// 数字选择：点 − / + 调整，不用输入框也不弹键盘
-function num(q, o){
-  return new Promise(async res=>{
-    await say(q); clearTray();
-    let v = o.def;
-    const dec = (String(o.s1).indexOf('.')>=0);
-    const fmt = x => dec ? (Math.round(x*10)/10).toFixed(1) : String(Math.round(x));
-    const wrap = el('div');
-    const row = el('div','stepper');
-    const disp = el('div','sdisp');
-    const val = el('b','',fmt(v)); const unit = el('span','',' '+o.unit);
-    disp.appendChild(val); disp.appendChild(unit);
-    const upd = ()=>{ val.textContent = fmt(v) };
-    const mk = (label,d)=>{
-      const b = el('button','chip sbtn',label);
-      b.onclick = ()=>{ v = Math.min(o.max, Math.max(o.min, Math.round((v+d)*10)/10)); upd() };
-      return b;
-    };
-    row.appendChild(mk('−'+o.s2,-o.s2)); row.appendChild(mk('−'+o.s1,-o.s1));
-    row.appendChild(disp);
-    row.appendChild(mk('+'+o.s1,o.s1)); row.appendChild(mk('+'+o.s2,o.s2));
-    wrap.appendChild(row);
-    const act = el('div','sact');
-    const ok = el('button','chip go','确定');
-    ok.onclick = ()=>{ add('user', fmt(v)+' '+o.unit); clearTray(); res(v) };
-    act.appendChild(ok);
-    if(o.skip){ const sk=el('button','chip ghost','跳过'); sk.onclick=()=>{add('user','跳过');clearTray();res(null)}; act.appendChild(sk); }
-    wrap.appendChild(act);
-    tray.appendChild(wrap); toBottom();
-  });
-}
+/* 每行一個動作，欄位順序：
+   [名稱 n, 類別 g, 器材等級 lv, 不適部位 t, 鍛鍊部位 mus, 器材 eq, 要點 how, wger 動作 id, 作者 au, 授權 lic, 別名(可選)]
+   - 只寫前 6 欄的行：訓練模板要用、但沒有 wger 資料的名稱（不進動作庫、沒有「怎么做」）。
+   - 別名：同一個 wger 動作在訓練模板裡用了另一個名字（例如 home 模板寫「哑铃高脚杯深蹲」）。
+     logic.js 會在原動作後面緊接著複製一行、只換名稱，所以 EXI 順序與舊版完全相同。
+   - 順序有意義：換動作、重點加練、動作庫列表都依這個順序，不要重新排序。 */
+const EXERCISE_ROWS = [
+// 深蹲类 sq
+ ['高脚杯深蹲','sq',1,'k','股四头肌、臀肌','哑铃','双手抱住哑铃贴近胸前，双脚与肩同宽、膝盖微屈。下蹲到大腿与地面平行，保持背部挺直，髋部向后，膝盖对准脚尖。重心放在脚跟，目视前方或略上方。',203,'ataraxie67','CC-BY-SA 4.0','哑铃高脚杯深蹲'],
+ ['哑铃深蹲','sq',1,'k','股四头肌、臀肌','哑铃'],
+ ['徒手深蹲','sq',0,'k','股四头肌、臀肌','徒手'],
+ ['相扑深蹲','sq',0,'k','臀肌、股四头肌','徒手','双脚比肩宽，脚尖外开约 45°。保持背部挺直，屈膝屈髋缓慢下蹲，像要坐下去，下到大腿与地面平行，再蹬地站起。',632,'sophialj','CC-BY-SA 4.0'],
+ ['抱头深蹲','sq',0,'k','臀肌、股四头肌','徒手','双脚与髋同宽、脚尖朝前，挺胸，双手放在脑后、手指轻扣、肘朝两侧。髋部向后推、屈膝，上身尽量保持直立。膝盖向外推，不能向内扣。',1208,'lxmx','CC-BY-SA 4.0'],
+ ['慢速深蹲','sq',0,'k','股四头肌、臀肌','徒手','用节奏控制来增加肌肉张力：3 秒慢慢下蹲，在底部停 1 秒，再用正常速度站起。挺胸，重心放在脚跟。',1963,'Anon#2','CC-BY-SA 4.0'],
+ ['靠墙静蹲','sq',0,'k','大腿前后侧','徒手','背靠平整的墙，慢慢下滑并让双脚离墙，直到大腿与地面平行、膝和髋大约成 90°。双臂交叉放胸前，保持 30 秒。',718,'Blablabla','CC0'],
+ ['腿举','sq',2,'k','股四头肌','腿举器械','腿举是用双腿把重量推离身体的负重训练。',371,'BFad07','CC0'],
+// 单腿、箭步类 lg
+ ['哑铃反向箭步蹲','lg',1,'k','臀肌、腘绳肌、股四头肌','哑铃','双手各持一只哑铃，向后迈一大步成箭步姿势，再回到站立。主要练臀肌、大腿后侧和前侧。',1651,'AlucardEvil40','CC-BY-SA 4.0'],
+ ['反向箭步蹲','lg',0,'k','臀肌、腘绳肌、小腿','徒手','向后迈步的箭步蹲，对臀部、大腿后侧和小腿肌群的刺激更多。',1102,'clafal','CC-BY-SA 4.0'],
+ ['哑铃保加利亚分腿蹲','lg',1,'k','臀肌、股四头肌','哑铃、长凳','后脚踩在高处（如长凳），用前腿做单腿下蹲。抬高后腿会增加不稳定性和动作幅度。',1706,'AlucardEvil40','CC-BY-SA 4.0'],
+ ['上台阶','lg',0,'k','臀肌、股四头肌','椅子','面对椅子站立，踏上椅子，再退下来，重复。',981,'','CC-BY-SA 4.0'],
+// 臀部与髋 gl
+ ['臀桥','gl',0,'','臀肌','徒手','仰卧，屈髋屈膝，双脚踩地。抬起臀部，让肩、髋、膝成一条直线。想加大强度，可以把脚垫高到台阶或长凳上。',265,'tdprice12','CC-BY-SA 4.0'],
+ ['单腿臀桥','gl',0,'','臀肌','徒手','摆好臀桥姿势，用脚跟支撑，交替把一条腿伸直。全程让髋部尽量保持伸展。',1906,'cybro','CC-BY-SA 4.0'],
+ ['负重臀桥','gl',1,'','臀肌','哑铃','坐在地上，把哑铃放在髋部，向上顶髋并夹紧臀肌。练臀肌，也有助改善髋部活动度。',1642,'AlucardEvil40','CC-BY-SA 4.0'],
+ ['臀推','gl',2,'','臀肌','长凳'],
+ ['单腿哑铃臀推','gl',2,'','臀肌','长凳、哑铃','上背靠在长凳上，一条腿抬起，另一条腿伸展髋部，单侧孤立收缩臀肌。左右分开练，对臀肌刺激更充分。',1234,'carlos3c','CC-BY-SA 4.0'],
+ ['弹力带臀部后踢','gl',1,'','臀肌','弹力带','四点跪姿，把弹力带固定在脚上，脚跟向后、向上踢，顶端夹紧臀肌。核心保持稳定，背部保持平直。',1613,'Tierrasverdes','CC-BY-SA 4.0'],
+ ['哑铃驴子踢腿','gl',1,'','臀肌、腘绳肌','哑铃、垫子','在垫子上四点跪姿，手在肩的正下方、膝在髋的正下方，用哑铃增加阻力，向后上方踢腿。主要练臀肌和大腿后侧。',1616,'Tierrasverdes','CC-BY-SA 4.0'],
+ ['跪姿后踢腿','gl',0,'','臀肌','徒手','四点跪姿，一只脚向后蹬直，注意力放在臀肌上。停 1 秒再回到起点，左右交替。',990,'','CC-BY-SA 4.0'],
+ ['器械臀部后踢','gl',2,'b','臀肌','器械','用脚跟发力，不要用脚尖。顶端不要过度反弓下背。',1723,'barry','CC-BY-SA 4.0'],
+ ['蚌式开合','gl',0,'','臀肌、核心','徒手','摆成侧撑姿势（前臂和肘撑地，双腿略弯）。双脚靠拢，抬起上方的膝盖，像贝壳张开，再慢慢回到起点。核心保持稳定，髋部对齐。',1823,'teus_ergaster','CC-BY-SA 4.0'],
+ ['弹力带蚌式开合','gl',1,'','臀肌、核心','弹力带','动作同蚌式开合，另外在膝盖上方的大腿间套一根对折的弹力带。',1842,'Croak6728','CC-BY-SA 4.0'],
+ ['侧卧髋外展','gl',0,'','臀肌（髋外侧）','徒手','侧卧，上方的腿伸直、下方的腿屈膝支撑。把上方的腿抬离地面，在顶端停一下。',1202,'wakanda90','CC-BY-SA 4.0'],
+ ['反向蚌式开合','gl',0,'','臀肌','徒手','侧卧，屈髋屈膝，两膝上下叠放。先让双脚并拢、两膝保持贴合，抬起上方的脚，再慢慢放下。动作只来自髋部，不要让骨盆向后翻。幅度小、控制好，重点是髋部旋转。',2448,'TobiasFalk','CC-BY-SA 4.0'],
+ ['器械髋外展（坐姿）','gl',2,'','臀肌','器械','坐进器械，背靠垫子；大腿内侧抵住阻力垫，调整座位让髋关节对准器械转轴。从双腿并拢或略压住垫子开始，慢慢向外分开。',1748,'Tierrasverdes','CC-BY-SA 4.0'],
+// 髋铰链 hg
+ ['哑铃罗马尼亚硬拉','hg',1,'b','腘绳肌、臀肌','哑铃','双手各持一只哑铃，在髋部向前屈，保持背部挺直，再回到站立。主要练大腿后侧和臀肌。',1652,'AlucardEvil40','CC-BY-SA 4.0'],
+ ['罗马尼亚硬拉','hg',2,'b','腘绳肌、臀肌','哑铃或杠铃'],
+ ['早安式','hg',0,'b','腘绳肌','徒手','双脚比肩宽，双手放在髋部。从髋部折叠，上身向地面前倾，背部保持挺直，再回到站立。',1392,'captive0592','CC-BY-SA 4.0'],
+ ['腿弯举','hg',2,'','腘绳肌','器械','腿弯举（也叫腘绳肌弯举）是孤立练大腿后侧的动作：在阻力下把小腿弯向臀部。',364,'BFad07','CC0'],
+ ['俯卧腿弯举','hg',2,'','腘绳肌','器械'],
+// 水平推 hp
+ ['标准俯卧撑','hp',0,'s','胸肌、手臂、肩','徒手','从平板支撑姿势开始，手比肩略宽，双脚并拢，从头到脚成一条直线。收紧核心，屈肘放低身体，再推回起点。',1551,'Settebello','CC-BY-SA 4.0'],
+ ['跪姿俯卧撑','hp',0,'s','胸肌、肩','徒手','双膝并拢跪地，双手在身前略比肩宽、位于肩的正下方，身体从头到膝成一条直线。屈肘降低躯干，躯干保持稳定，膝盖不离地，再用手推地回到起点。',1218,'PaukOne','CC-BY-SA 4.0'],
+ ['上斜俯卧撑（手扶椅子）','hp',0,'s','胸肌、三头肌','椅子或长凳','上半身抬高，主要练胸肌，同时练到三头肌、肩和核心。与标准俯卧撑相比，三头肌参与较少。',1111,'anon1337','CC-BY-SA 4.0'],
+ ['哑铃地板卧推','hp',1,'s','胸肌','哑铃','双手持哑铃仰卧，屈膝、双脚踩地（有长凳可以用）。把哑铃推起到肘部伸直，再慢慢放下，直到上臂靠近身体并贴到地面，停一下再推起。顶端夹紧胸肌。',1084,'','CC-BY-SA 4.0'],
+ ['哑铃卧推','hp',2,'s','胸肌','哑铃、长凳'],
+ ['胸部推举机','hp',2,'s','胸肌','器械'],
+// 垂直推、侧平举 vp
+ ['哑铃肩推','vp',1,'s','肩部','哑铃','坐在长凳上，靠背接近垂直。双手持哑铃举到肩高，手掌和肘全程朝前。向上推起，最高点哑铃靠近但不碰到，再慢慢放下重复。',567,'wger.de','CC-BY-SA 3.0','哑铃推肩'],
+ ['哑铃侧平举','vp',1,'s','肩部（三角肌）','哑铃','练三角肌。手臂伸直或微屈，把哑铃向两侧抬到约与肩同高。身体略向前倾，髋和膝微屈。',348,'wger.de','CC-BY-SA 3.0'],
+// 水平拉 hr
+ ['哑铃俯身划船','hr',1,'b','背阔肌','哑铃','双手各持一只哑铃，髋部折叠、臀向后推，上身与地面约成 45–75°，膝盖微屈。哑铃垂在肩下，手臂伸直，背保持平直、挺胸、核心收紧，不要弓背。再把哑铃拉向肋骨或髋的方向。',2669,'karthikrrk','CC-BY-SA 4.0'],
+ ['哑铃单臂划船','hr',1,'b','背阔肌','哑铃','俯身直到手垂在膝盖以下，上身角度保持不变。收紧背阔肌，把肘向后拉并夹紧肩胛。每一次都不要站起来，手要低于膝盖。',81,'sebk','CC-BY-SA 4.0','哑铃单臂划船（扶椅）'],
+ ['胸托哑铃划船','hr',2,'','背阔肌、二头肌','可调长凳、哑铃','把可调长凳调到 45°，俯卧，头悬在凳沿上方。双手各持哑铃，核心和背阔肌收紧、肩部中立。向上腹部方向划，顶端夹紧背部，再放回起点。',1283,'carlos3c','CC-BY-SA 4.0'],
+ ['弹力带坐姿划船','hr',1,'','背阔肌','弹力带','坐在地上，双腿伸直、背挺直。弹力带绕过双脚脚掌，双手各握一端，手臂伸直、膝微屈。让肘直直向后，把弹力带拉向下肋，夹紧肩胛。挺胸，躯干不要后仰借力。',2635,'trs1800','CC-BY-SA 4.0'],
+ ['坐姿划船','hr',2,'','背阔肌','绳索器械','坐在器械上双脚踩稳，比肩略宽。脚跟蹬地、夹紧臀部，握住把手，坐直、膝微屈。收紧腹部和下背，让躯干垂直于地面。肩膀往后往下沉，划船时夹紧肩胛，想象两肩胛间夹着一支铅笔。',1117,'Franpol','CC-BY-SA 4.0'],
+// 垂直拉 vr
+ ['高位下拉','vr',2,'','背阔肌','绳索器械','起始双臂在头上伸直，感觉背阔肌被拉伸，肩膀下沉、不要耸肩。拉的时候让肘向下向后带，把横杆拉到上胸或锁骨附近。挺胸，底部夹紧肩胛。',723,'tuckerm','CC-BY-SA 3.0'],
+// 肩后束与上背 rd
+ ['弹力带面拉','rd',1,'','上背、肩后束','弹力带','站姿水平拉。握住弹力带到脸的高度，让肘抬高并向外，朝脸的方向拉，同时夹紧肩胛。练上背和肩后束，有助改善体态。',1732,'54str','CC-BY-SA 4.0'],
+ ['弹力带拉开','rd',1,'','上背、肩后束','弹力带','双手握住弹力带，手臂在身前伸直、与肩同高，肘微屈并固定。向两侧拉开直到弹力带接近胸口，再缓慢回到起点，控制张力。',1380,'schwolfar','CC-BY-SA 4.0'],
+ ['绳索面拉','rd',2,'','上背、肩后束','绳索器械'],
+ ['俯卧W字','rd',0,'','上背、肩后束','徒手'],
+ ['胸托后束飞鸟（Y 字）','rd',2,'','肩后束','可调长凳、轻哑铃','把上斜凳调到 30–45°，胸贴凳面俯卧，头保持中立或略朝下，避免颈部压力。手握轻哑铃、掌心相对（拇指朝上）。手臂伸直或微屈，向上向外举成“Y”字。动作要来自肩和肩胛，不要用身体甩。',1825,'beagle','CC-BY-SA 4.0'],
+ ['哑铃俯身面拉','rd',1,'b','上背、肩','哑铃','用哑铃做俯身面拉，练上背和肩。把重量拉向脸部，肘保持高位，夹紧肩胛。',1639,'AlucardEvil40','CC-BY-SA 4.0'],
+// 三头、二头
+ ['哑铃俯身臂屈伸','tr',1,'s','三头肌','哑铃','双手各持一只哑铃，掌心相对躯干。背挺直、膝微屈，髋部前屈，躯干接近与地面平行，抬头。上臂紧贴躯干并与地面平行，前臂垂向地面、肘约成 90°，再向后伸直前臂。',655,'bodybuilding.com','CC-BY-SA 3.0'],
+ ['哑铃臂屈伸','tr',1,'s','三头肌','哑铃','要点：肘部固定，肌肉主动发力，不借惯性，动作受控且缓慢，不要过度伸直。',1336,'Anastasious','CC-BY-SA 4.0'],
+ ['绳索三头下压','tr',2,'','三头肌','绳索器械','常见的三头肌动作，容易学。通常做 8–12 次或更多，放在上肢或手臂训练日里。',805,'cshep442','CC-BY-SA 4.0'],
+ ['哑铃弯举','bi',1,'','二头肌','哑铃'],
+// 核心 core
+ ['平板支撑','core',0,'','核心','徒手','前臂和脚尖撑地，手臂弯曲、肘在肩的正下方。身体全程保持一条直线，尽量久地保持。想加大难度，可以抬起一只手臂或一条腿。',458,'YYCfit / BFad07','CC-BY-SA 3.0'],
+ ['侧平板支撑','core',0,'','腹斜肌','徒手','练腹斜肌，帮助稳定脊柱。侧躺，用前臂和膝到脚的一侧撑起身体。',580,'bodybuilding.com','CC-BY-SA 4.0'],
+ ['鸟狗式','core',0,'','核心、背部','徒手','核心稳定动作，提升平衡、协调和脊柱对位，冲击小。四点跪撑，手在肩下、膝在髋下，保持脊柱中立。右臂向前、左腿向后同时伸出，髋部保持端正，到最远处稍停。',1572,'Settebello','CC-BY-SA 4.0'],
+ ['死虫','core',0,'','腹肌','徒手','仰卧，下背压向地面。对侧的手和脚缓慢伸出，脊柱保持中立，平稳呼吸。受控地收回，不要弓腰。',2752,'ruochenma','CC-BY-SA 4.0'],
+ ['超人式','core',0,'b','下背、臀肌','垫子','俯卧，手臂向前伸直、双腿伸直放平。同时抬起手臂和双腿，像在飞，收紧下背，保持呼吸。按能力每次保持 2–5 秒。',636,'baldurmen','CC-BY-SA 4.0'],
+ ['反向卷腹','core',0,'','腹肌','徒手','仰卧，手放在臀部附近。抬腿，到大约七成高度时骨盆也可以跟着抬起。顶端停 1–2 秒，再回到起点。',1772,'eufvksruh','CC-BY-SA 4.0'],
+ ['帕洛夫推（抗旋转）','core',1,'','核心','弹力带或绳索','抗旋转动作，训练脊柱周围的大小肌群去抵抗旋转。侧身站在固定点旁，双手握住把手或弹力带，躯干正对前方，把手收到胸口中央，慢慢向前推出，再慢慢收回。',1194,'prevail90','CC-BY-SA 4.0'],
+// 小腿 calf
+ ['站姿提踵','calf',0,'','小腿','徒手'],
+ ['哑铃提踵','calf',1,'','小腿','哑铃','双手各持一只哑铃，手臂自然下垂，双脚与髋同宽。想加大幅度，可以让前脚掌踩在台阶上。踮脚尽量抬高并稍停，再慢慢放下脚跟，直到小腿有拉伸感。膝盖微屈、不要锁死，上身保持直立。',2661,'','CC-BY-SA 4.0'],
+// ---- 徒手动作扩充（wger）----
+ ['椅子深蹲','sq',0,'k','臀肌、股四头肌','椅子或箱子','在身后放一把椅子（或箱子），高度要让你下蹲时能用臀部轻触到它，同时背部保持挺直。双脚与肩同宽、脚尖略外开，收紧核心、背部中立。像要坐到椅子上一样，向后坐、屈膝屈髋，让髋部下沉到椅面。',977,'clafal','CC-BY-SA 4.0'],
+ ['正向箭步蹲','lg',0,'k','臀肌、股四头肌','徒手','站直，背挺直。左腿向前迈一大步，降低骨盆直到右膝几乎碰到地面，再抬起骨盆，退回一步回到起点。左右腿交替。',984,'','CC-BY-SA 4.0'],
+ ['分腿蹲','lg',0,'k','臀肌、股四头肌','徒手','站直，背挺直，左腿向前迈一大步。降低骨盆，直到右膝几乎碰到地面，再抬起，重复。做完一侧再换另一侧。',991,'','CC-BY-SA 4.0'],
+ ['侧向分腿蹲','lg',0,'k','大腿、臀部','徒手','站直，向侧面迈一大步，比肩略宽。弯曲一侧的膝盖，让大腿与地面平行，弯曲的膝盖要与脚尖在同一方向。再推回起点，重复。',986,'','CC-BY-SA 4.0'],
+ ['哥萨克深蹲','lg',0,'k','腿部、臀部','徒手','哥萨克深蹲是多关节动作，主要练腿和臀，也需要稳定肌肉参与，能练力量、灵活性和稳定性。',1407,'clafal','CC-BY-SA 4.0'],
+ ['扶椅分腿蹲','lg',0,'k','股四头肌','椅子或墙','前后分腿站，前脚在后脚前约一步，手扶稳固的支撑物（墙或椅背）。双膝弯曲让髋部垂直下降，直到后膝几乎碰到地面。上身保持直立，前脚脚跟着地，再用前脚发力推起。支撑物只用来保持平衡，不要靠它拉起身体。一侧做完再换另一侧。',2557,'','CC-BY-SA 3.0'],
+ ['站姿抬腿（髋稳定）','gl',0,'','髋周围肌群','徒手','上身保持稳定，主要用一条腿站立，另一条腿不负重，反复抬起、在髋和膝处弯曲，再放下。两侧都做。这个动作练的是髋部周围肌群的稳定性。',1096,'tregga','CC-BY-SA 4.0'],
+ ['宽距俯卧撑','hp',0,'s','胸肌外侧、肩','徒手','双手比肩宽，增加对胸外侧和肩的刺激。下放到胸部几乎碰地，核心收紧，再用手掌发力推起。不要塌腰，保持从头到脚一条直线。',1964,'Anon#2','CC-BY-SA 4.0'],
+ ['钻石俯卧撑','hp',0,'s','胸肌、三头肌','徒手','平板支撑姿势，双手靠近放在胸下，拇指和食指围成菱形。屈肘让胸向双手下降，身体保持一条直线，再推起到手臂完全伸直。肘靠近身体，核心收紧。',386,'notdefine','CC-BY-SA 4.0'],
+ ['三头肌俯卧撑','tr',0,'s','三头肌','徒手','针对三头肌的俯卧撑。平板支撑姿势，双手在肩的正下方，双脚并拢。下降时让肘夹在身体两侧、上臂指向正后方，降到胸部碰地再回到起点。',2684,'JuustoKakku','CC-BY-SA 4.0'],
+ ['三点支撑俯卧撑','hp',0,'s','胸肌、核心','徒手','摆好俯卧撑姿势，肩在手的正上方，双脚与髋同宽。肚脐向脊柱收，收紧腹肌。左脚抬离地面约 5 厘米，脚尖朝下，髋部不要动，从头到脚始终成一条直线。然后屈肘，让胸部降到接近地面，再推起。换另一侧重复。',1209,'lxmx','CC-BY-SA 4.0'],
+ ['站姿 T/Y/I 举臂','rd',0,'s','肩、上背','徒手','站直，双脚与髋同宽，核心收紧，手臂放松垂在身侧。依次做三种举臂：T 举（手臂向两侧伸直举到与地面平行）、Y 举（手臂向上约 45°举成 Y 字）、I 举（手臂并拢举过头顶成 I 字）。保持脊柱中立，不要反弓下背。',1606,'WiNNiE','CC-BY-SA 4.0'],
+ ['YTW 举臂','rd',0,'s','肩胛之间的肌群','徒手','YTW 动作用来强化两肩胛之间的肌肉，帮助把肩往后收，保持挺拔的体态。',2454,'probablyforging','CC-BY-SA 4.0'],
+ ['蝴蝶超人式','core',0,'b','上背、后颈','垫子','俯卧，十指交叉放在脑后，抬起头，并把双肘尽量向上抬。',1908,'cybro','CC-BY-SA 4.0'],
+ ['跪姿对侧超人式','core',0,'','臀肌、大腿后侧、肩','徒手','四点跪姿，一只脚向后蹬直，直到整条腿伸直，脚要抬高、像被向后拉。手臂向前伸直，注意肩要抬高。单侧静态保持。',1910,'cybro','CC-BY-SA 4.0'],
+ ['高位平板支撑','core',0,'s','核心','徒手','手和脚尖触地，背、手臂和腿都伸直。可以先趴在地上，双手掌心朝下放在头两侧，再把手臂撑直到这个位置。全程保持起始姿势。',1001,'','CC-BY-SA 4.0'],
+ ['平板支撑伸手','core',0,'s','核心','徒手','摆成平板支撑，眼睛看地面。一只手向前抬起再收回，换另一只手。抬起和收回都要慢，身体尽量保持不动。',1766,'','CC-BY-SA 4.0'],
+ ['平板支撑拍肩','core',0,'s','核心、肩','垫子','摆成标准平板支撑，双脚比肩略宽。交替抬起一只手，去触碰对侧的肩膀。',1091,'clafal','CC-BY-SA 4.0'],
+ ['动态侧平板支撑','core',0,'','腹斜肌','徒手','侧躺，用一侧的肘和脚的外侧撑起身体，让髋部上下起落，同时身体保持一条直线。',1288,'painDpice','CC-BY-SA 4.0'],
+ ['自行车卷腹','core',0,'','腹肌、腹斜肌','垫子','仰卧，手放在脑后，双腿伸直。让肩膀离地，一侧膝盖收向胸口，同时转体，让对侧的肘去碰膝盖。左右交替，像蹬自行车一样。动作要受控，核心全程发力。',1412,'hpmbala','CC-BY-SA 4.0'],
+ ['抬腿卷腹','core',0,'','腹肌','垫子','仰卧，双腿笔直向上举。用双手去够脚尖，同时让肩胛骨离开地面，再放回。',174,'krisbbb','CC-BY-SA 4.0'],
+ ['悬停卷腹','core',0,'','上腹','垫子','仰卧，双脚平放在地上，双臂交叉放在头上、手在脑后。抬起上身，让肩胛骨离开地面，在顶端停 1–2 拍。尽量让上腹发力，保持质量，做 10 次。目标是上身动、下半身不动。',1478,'Moffi','CC-BY-SA 4.0'],
+ ['站姿侧屈卷腹','core',0,'','腹斜肌','徒手','站直，双脚与肩同宽，手放脑后。上身向一侧倾，收缩腹斜肌，让肘靠近髋。回到起点后左右交替，或做完一侧再换另一侧。这个动作能练腹斜肌，同时改善平衡与稳定。',1426,'hpmbala','CC-BY-SA 4.0'],
+ ['单腿提踵','calf',0,'','小腿','台阶（可选）','站在地面或台阶边缘（台阶能加大活动幅度）。抬起一只脚，把脚跟抬高到踮脚站立，在顶端停 3 秒。慢慢放下脚跟，直到几乎碰到地面，不要砸下去。',1021,'','CC-BY-SA 4.0'],
+// ---- 热身与拉伸 st ----
+ ['儿童式','st',0,'','背部、髋、大腿','垫子','四点跪姿，膝盖、脚趾和双手着地，两只大脚趾相碰。把膝盖分开到与髋同宽。呼气时让骨盆向后，坐到脚跟上，双手仍贴地。上身放松，前额放到地面，双手自然向前滑。保持这个姿势。要出这个姿势，先把手走回到肩的正下方，再把上身抬起坐直。',1002,'','CC-BY-SA 4.0'],
+ ['站姿小腿拉伸','st',0,'','小腿','墙或椅子','拉伸小腿肌（腓肠肌），随处都能做，只要有一面墙或一把椅子。',1239,'erikocobra','CC-BY-SA 4.0'],
+ ['三头肌拉伸','st',0,'','三头肌','徒手','一只手放在背后，用另一只手抓住这只手的肘，轻轻往下拉。保持几秒，再换另一侧。',1230,'Lynn_McIntyre','CC-BY-SA 4.0'],
+ ['肩部绕环','st',0,'','肩关节','徒手','坐着或站着，背挺直。双手放在肩上，以中等速度反复转动两侧肩关节，画圆。',1004,'','CC-BY-SA 4.0'],
+ ['手臂绕环','st',0,'','肩、手臂','徒手','站直，背挺直。手臂保持伸直，从身前向下、绕到背后、再越过头顶回到原位，然后连续画圆。',994,'','CC-BY-SA 4.0'],
+// ---- 女性常练：臀腿、髋、体态、手臂、核心（wger）----
+ ['弹力带四点跪姿髋外展','gl',1,'','臀肌、髋外侧','弹力带','四点跪姿，体重均匀分在双膝和双手上。躯干保持稳定，收紧腹部，腰椎保持挺直、不要扭转（想象下背上放着一杯水，不会倒）。把一条腿向外侧抬起，抬腿时不要扭转。',1915,'treder','CC-BY-SA 4.0'],
+ ['仰卧髋外展','gl',0,'','臀肌、髋外侧','垫子','仰卧在垫子上，双腿伸直放松，手臂放在身体两侧或向两边展开，帮助稳定。把一条腿轻轻抬离地面（伸直或略弯），再向外侧移动，远离身体中线。',1886,'teus_ergaster','CC-BY-SA 4.0'],
+ ['哑铃青蛙推髋','gl',1,'','臀肌','哑铃','与臀推相似，但双脚并在一起，让膝盖向外打开成青蛙的姿势，再把臀部抬离地面（用哑铃增加阻力）。',1503,'JohnPreston','CC-BY-SA 4.0'],
+ ['臀桥单臂哑铃推举','hp',1,'s','臀肌、胸','哑铃','单手持一只哑铃做臀桥。把哑铃举在胸口上方，这是每次的起始位置。放下哑铃，让肘碰到地面（如果用长凳，肘大约低于肩 45°），再把哑铃推回起始位置。',1686,'meldun','CC-BY-SA 4.0'],
+ ['哑铃俯身侧抬肘（后束）','rd',1,'b','肩后束、上背','哑铃','双手各持一只哑铃，髋部前屈，让背接近与地面平行，手臂自然下垂并与肩在同一条线上。屈肘，把肘向两侧抬起，直到上臂与地面平行，再慢慢放回，重复。',1227,'Lynn_McIntyre','CC-BY-SA 4.0'],
+ ['哑铃过头臂屈伸（双手握）','tr',1,'s','三头肌','哑铃','把一只哑铃举过头，双手托在内侧垫片下（像捧着一颗心的握法）。肘在头的上方，屈肘让前臂落到上臂后面。底部要注意别让哑铃撞到颈后。再伸直手肘，把哑铃举回头顶。',211,'tuninx','CC-BY-SA 3.0'],
+ ['站姿宽距早安式','hg',0,'b','大腿后侧','徒手','双脚比肩宽，脚尖略向外，双手放在脑后。髋部折叠，让上身向地面下降，背保持挺直、胸打开。',1397,'captive0592','CC-BY-SA 4.0'],
+ ['空心支撑','core',0,'','腹肌','垫子','在垫子上仰卧，收紧腹肌，伸直手臂和双腿并抬起（头和肩膀也离地）。保持下背始终贴住垫子。',297,'Behrooz','CC0'],
+ ['仰卧交替打腿','core',0,'b','下腹','垫子','仰卧，把伸直的双腿抬离地面约 45°。一只脚向下、几乎碰到地面时，另一只脚尽量抬到 90° 或接近。再换脚，交替进行。',235,'nate303303','CC-BY-SA 4.0'],
+ ['手撑地前走','core',0,'s','核心、肩','徒手','站姿，膝盖微屈，双手放在地上。从这个姿势开始，用双手向前走，同时保持臀部收紧、下背不要失控。',1103,'clafal','CC-BY-SA 4.0'],
+ ['内收肌后坐拉伸','st',0,'','大腿内侧','徒手','四点跪姿，双手在肩的正下方、双膝在髋的正下方。一条腿向侧面伸直，脚掌平放、脚尖朝前。背保持平直，慢慢把髋部向后推向跪着那条腿的脚跟，直到感觉到拉伸。',2614,'','CC-BY-SA 4.0'],
+ ['90/90 髋转换','st',0,'','髋、臀','徒手','坐在地上，一条腿在身前弯成 90°，另一条腿在侧面弯成 90°，让后面的小腿与前面的小腿平行。上身保持直立，可以的话手不要撑地。把双膝一起转向另一侧，让两条腿互换位置。',2613,'','CC-BY-SA 4.0'],
+ ['髋屈肌拉伸','st',0,'','髋前侧、大腿前侧','徒手','跪成箭步姿势，一膝着地、另一只脚在前，双手叉腰。躯干保持直立，收紧后腿一侧的臀部，把髋部向前推，直到髋前侧和大腿前侧有拉伸感。保持一会，再换边。',1867,'Davidgj32','CC-BY-SA 4.0'],
+ ['髋部交叉拉伸','st',0,'','髋、臀、下背','垫子','仰卧，手臂向两侧伸展，双腿并拢屈膝。把双膝慢慢倒向一侧，同时让肩膀和手臂保持贴地，你会在髋、臀和下背感到拉伸。稍停，把膝盖带回中间，再换另一侧。',1863,'Davidgj32','CC-BY-SA 4.0'],
+ ['蝴蝶式拉伸','st',0,'','大腿内侧、髋','徒手','坐成祈祷姿势，双脚脚底轻轻相贴。用手慢慢把双脚拉向腹股沟，按需要保持。',1843,'Croak6728','CC-BY-SA 4.0'],
+ ['青蛙式拉伸','st',0,'','臀、髋','垫子','四点跪姿，把膝盖向外打开，降低到用前臂撑地。肘和膝不动，开始前后摇动，让臀部尽量靠近脚。',1844,'Croak6728','CC-BY-SA 4.0'],
+ ['台阶小腿拉伸','st',0,'','小腿','台阶、墙或栏杆','站在台阶或稳固的高处，前脚掌踩在边缘，脚跟悬空，扶着栏杆或墙保持平衡。让一只或双脚的脚跟降到低于台阶，感到小腿被拉伸并保持。膝盖伸直时，拉伸的是小腿的腓肠肌。',2666,'trs1800','CC-BY-SA 4.0']
+];
 
-/* ================= 计算 ================= */
-const GOAL = {fat:'减脂',muscle:'增肌塑形',shape:'改善体态、紧致线条',keep:'保持健康'};
-function calc(A){
-  const w=A.weight,h=A.height,a=A.age;
-  const bmr = 10*w + 6.25*h - 5*a - 161;            // Mifflin-St Jeor（女）
-  const af = {2:1.35,3:1.45,4:1.55,5:1.6}[A.days];
-  const tdee = bmr*af;
-  const bmi = w/Math.pow(h/100,2);
-  const flagged = A.health.some(x=>x!=='none') || a<18;
-  const low = bmi<18.5;
-  let kcal = tdee, mode='维持';
-  if(!flagged){
-    if(A.goal==='fat' && !low){ kcal=Math.max(tdee*0.8,bmr,1200); mode='温和减脂' }
-    else if(A.goal==='shape' && !low){ kcal=tdee*0.95; mode='轻微热量缺口' }
-    else if(A.goal==='muscle'){ kcal=tdee*1.05; mode='轻微盈余' }
-  }
-  kcal = Math.round(kcal/10)*10;
-  const pPerKg = (A.goal==='fat'||A.goal==='muscle') ? 1.8 : 1.5;
-  const p = Math.round(w*pPerKg);
-  const f = Math.round(kcal*0.27/9);
-  const c = Math.max(100, Math.round((kcal-4*p-9*f)/4));
-  const weekly = (kcal-tdee)*7/7700;                  // 约值
-  return {bmr:Math.round(bmr),tdee:Math.round(tdee/10)*10,bmi,flagged,low,kcal,mode,p,f,c,weekly};
-}
+/* 女性常練：只決定哪些動作屬於動作庫「女性常练」分類；顯示順序仍依 EXERCISE_ROWS 與類別 */
+const WOMEN = [
+ '臀桥','单腿臀桥','负重臀桥','单腿哑铃臀推','哑铃青蛙推髋','弹力带臀部后踢',
+ '哑铃驴子踢腿','跪姿后踢腿','蚌式开合','弹力带蚌式开合','反向蚌式开合','侧卧髋外展',
+ '仰卧髋外展','弹力带四点跪姿髋外展','器械髋外展（坐姿）','站姿抬腿（髋稳定）','相扑深蹲','抱头深蹲',
+ '反向箭步蹲','哥萨克深蹲','弹力带面拉','弹力带拉开','站姿 T/Y/I 举臂','YTW 举臂',
+ '胸托后束飞鸟（Y 字）','哑铃俯身侧抬肘（后束）','三头肌俯卧撑','哑铃臂屈伸','哑铃过头臂屈伸（双手握）','死虫',
+ '鸟狗式','侧平板支撑','动态侧平板支撑','空心支撑','自行车卷腹','站姿侧屈卷腹',
+ '儿童式','90/90 髋转换','髋屈肌拉伸','髋部交叉拉伸','蝴蝶式拉伸','青蛙式拉伸',
+ '内收肌后坐拉伸'
+];
 
-/* ================= 训练 ================= */
-const SAFE = ['臀桥','鸟狗式','死虫','平板支撑','侧平板支撑','蚌式开合'];
+/* 示範圖：wger 動作 id → 圖片（img/ 下的檔名、作者、授權） */
+const IMGS = {
+ '81':[{f:'81-1.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '203':[{f:'203-1.jpg',au:'philip',lic:'CC-BY-SA 4.0'},{f:'203-2.jpg',au:'philip',lic:'CC-BY-SA 4.0'}],
+ '265':[{f:'265-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '297':[{f:'297-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '348':[{f:'348-1.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'348-2.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '364':[{f:'364-1.png',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '371':[{f:'371-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '458':[{f:'458-1.png',au:'utkb',lic:'CC-BY-SA 4.0'},{f:'458-2.png',au:'utkb',lic:'CC-BY-SA 4.0'}],
+ '567':[{f:'567-1.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'567-2.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '805':[{f:'805-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '977':[{f:'977-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '981':[{f:'981-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '984':[{f:'984-1.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '990':[{f:'990-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '1002':[{f:'1002-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '1084':[{f:'1084-1.jpg',au:'',lic:'CC-BY-SA 4.0'}],
+ '1091':[{f:'1091-1.jpg',au:'clafal',lic:'CC-BY-SA 4.0'}],
+ '1117':[{f:'1117-1.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'},{f:'1117-2.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '1194':[{f:'1194-1.png',au:'',lic:'CC-BY-SA 4.0'},{f:'1194-2.png',au:'prevail90',lic:'CC-BY-SA 4.0'}],
+ '1227':[{f:'1227-1.gif',au:'Lynn_McIntyre',lic:'CC-BY-SA 4.0'}],
+ '1230':[{f:'1230-1.jpg',au:'anonymous',lic:'CC-BY-SA 4.0'}],
+ '1239':[{f:'1239-1.jpg',au:'erikocobra',lic:'CC-BY-SA 4.0'}],
+ '1283':[{f:'1283-1.jpg',au:'carlos3c',lic:'CC-BY-SA 4.0'}],
+ '1336':[{f:'1336-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '1392':[{f:'1392-1.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'1392-2.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '1551':[{f:'1551-1.jpg',au:'Settebello',lic:'CC-BY-SA 4.0'}],
+ '1572':[{f:'1572-1.jpg',au:'Settebello',lic:'CC-BY-SA 4.0'}],
+ '1613':[{f:'1613-1.jpg',au:'',lic:'CC-BY-SA 4.0'}],
+ '1616':[{f:'1616-1.jpg',au:'',lic:'CC-BY-SA 4.0'}],
+ '1639':[{f:'1639-1.jpg',au:'AlucardEvil40',lic:'CC-BY-SA 4.0'}],
+ '1642':[{f:'1642-1.jpg',au:'AlucardEvil40',lic:'CC-BY-SA 4.0'}],
+ '1651':[{f:'1651-1.jpg',au:'AlucardEvil40',lic:'CC-BY-SA 4.0'}],
+ '1652':[{f:'1652-1.jpg',au:'AlucardEvil40',lic:'CC-BY-SA 4.0'}],
+ '1706':[{f:'1706-1.jpg',au:'AlucardEvil40',lic:'CC-BY-SA 4.0'}],
+ '1732':[{f:'1732-1.jpg',au:'54str',lic:'CC-BY-SA 4.0'}],
+ '1748':[{f:'1748-1.jpg',au:'',lic:'CC-BY-SA 4.0'}],
+ '1863':[{f:'1863-1.png',au:'Davidgj32',lic:'CC-BY-SA 4.0'}],
+ '1867':[{f:'1867-1.png',au:'Davidgj32',lic:'CC-BY-SA 4.0'}],
+ '1963':[{f:'1963-1.png',au:'',lic:'CC-BY-SA 4.0'}]
+};
+
+/* 示範影片：動作名稱 → 影片連結。填了就優先顯示「看示范视频」；沒填就顯示 B 站搜尋入口。（目前為空） */
+const VIDEOS = {};
+
+/* 訓練模板：場地 → 模板 → 動作名稱（依序取前 n 個）。
+   每個名稱必須在 EXERCISE_ROWS 裡（含別名）；不適部位 t 直接取自動作資料，不再在這裡重複標註。 */
 const LIB = {
  gym:{
-  A:[['高脚杯深蹲','k'],['哑铃卧推','s'],['坐姿划船',''],['臀推',''],['哑铃推肩','s'],['平板支撑','']],
-  B:[['罗马尼亚硬拉','b'],['高位下拉',''],['腿举','k'],['胸部推举机','s'],['俯卧腿弯举',''],['死虫','']],
-  C:[['哑铃反向箭步蹲','k'],['哑铃单臂划船','b'],['臀推',''],['哑铃侧平举','s'],['高位下拉',''],['鸟狗式','']],
-  lower:[['腿举','k'],['罗马尼亚硬拉','b'],['臀推',''],['俯卧腿弯举',''],['哑铃保加利亚分腿蹲','k'],['站姿提踵','']],
-  upper:[['高位下拉',''],['哑铃卧推','s'],['坐姿划船',''],['哑铃推肩','s'],['绳索面拉',''],['哑铃弯举','']]
+  A:['高脚杯深蹲','哑铃卧推','坐姿划船','臀推','哑铃推肩','平板支撑'],
+  B:['罗马尼亚硬拉','高位下拉','腿举','胸部推举机','俯卧腿弯举','死虫'],
+  C:['哑铃反向箭步蹲','哑铃单臂划船','臀推','哑铃侧平举','高位下拉','鸟狗式'],
+  lower:['腿举','罗马尼亚硬拉','臀推','俯卧腿弯举','哑铃保加利亚分腿蹲','站姿提踵'],
+  upper:['高位下拉','哑铃卧推','坐姿划船','哑铃推肩','绳索面拉','哑铃弯举']
  },
  home:{
-  A:[['哑铃高脚杯深蹲','k'],['哑铃俯身划船','b'],['臀桥',''],['哑铃地板卧推','s'],['弹力带面拉',''],['平板支撑','']],
-  B:[['哑铃罗马尼亚硬拉','b'],['跪姿俯卧撑','s'],['哑铃单臂划船（扶椅）','b'],['负重臀桥',''],['哑铃肩推','s'],['死虫','']],
-  C:[['哑铃反向箭步蹲','k'],['弹力带坐姿划船',''],['单腿臀桥',''],['哑铃侧平举','s'],['鸟狗式',''],['侧平板支撑','']],
-  lower:[['哑铃深蹲','k'],['哑铃罗马尼亚硬拉','b'],['负重臀桥',''],['哑铃保加利亚分腿蹲','k'],['弹力带蚌式开合',''],['站姿提踵','']],
-  upper:[['哑铃单臂划船（扶椅）','b'],['跪姿俯卧撑','s'],['哑铃肩推','s'],['弹力带面拉',''],['哑铃弯举',''],['哑铃臂屈伸','s']]
+  A:['哑铃高脚杯深蹲','哑铃俯身划船','臀桥','哑铃地板卧推','弹力带面拉','平板支撑'],
+  B:['哑铃罗马尼亚硬拉','跪姿俯卧撑','哑铃单臂划船（扶椅）','负重臀桥','哑铃肩推','死虫'],
+  C:['哑铃反向箭步蹲','弹力带坐姿划船','单腿臀桥','哑铃侧平举','鸟狗式','侧平板支撑'],
+  lower:['哑铃深蹲','哑铃罗马尼亚硬拉','负重臀桥','哑铃保加利亚分腿蹲','弹力带蚌式开合','站姿提踵'],
+  upper:['哑铃单臂划船（扶椅）','跪姿俯卧撑','哑铃肩推','弹力带面拉','哑铃弯举','哑铃臂屈伸']
  },
  body:{
-  A:[['徒手深蹲','k'],['跪姿俯卧撑','s'],['臀桥',''],['超人式','b'],['平板支撑',''],['死虫','']],
-  B:[['反向箭步蹲','k'],['上斜俯卧撑（手扶椅子）','s'],['单腿臀桥',''],['俯卧W字',''],['鸟狗式',''],['侧平板支撑','']],
-  C:[['相扑深蹲','k'],['臀桥',''],['蚌式开合',''],['俯卧W字',''],['死虫',''],['平板支撑','']],
-  lower:[['徒手深蹲','k'],['单腿臀桥',''],['反向箭步蹲','k'],['蚌式开合',''],['站姿提踵',''],['靠墙静蹲','k']],
-  upper:[['跪姿俯卧撑','s'],['上斜俯卧撑（手扶椅子）','s'],['超人式','b'],['俯卧W字',''],['平板支撑',''],['侧平板支撑','']]
+  A:['徒手深蹲','跪姿俯卧撑','臀桥','超人式','平板支撑','死虫'],
+  B:['反向箭步蹲','上斜俯卧撑（手扶椅子）','单腿臀桥','俯卧W字','鸟狗式','侧平板支撑'],
+  C:['相扑深蹲','臀桥','蚌式开合','俯卧W字','死虫','平板支撑'],
+  lower:['徒手深蹲','单腿臀桥','反向箭步蹲','蚌式开合','站姿提踵','靠墙静蹲'],
+  upper:['跪姿俯卧撑','上斜俯卧撑（手扶椅子）','超人式','俯卧W字','平板支撑','侧平板支撑']
  }
 };
+
+/* 每週課表：練幾天 → [模板, 標題]；cardio 為有氧日 */
 const SCHED = {
  2:[['A','全身 A'],['B','全身 B']],
  3:[['A','全身 A'],['B','全身 B'],['C','全身 C']],
@@ -227,179 +408,21 @@ const SCHED = {
 };
 const WK = {2:['周二','周五'],3:['周一','周三','周五'],4:['周一','周二','周四','周六'],5:['周一','周二','周四','周五','周六']};
 
-/* ================= 动作资料库 =================
-   来源：wger 工作与健身管理项目（https://wger.de），数据按 CC-BY-SA 授权。
-   中文名称和要点由本页根据 wger 的英文说明挑选并改写，作者逐条标注。
-   lv：0 徒手，1 家里有哑铃/弹力带，2 健身房。t：k 膝盖 b 腰背 s 肩颈（我按动作类型自行标注，非 wger 提供）。 */
-const EXI = [];
-function R(n,g,lv,t,mus,eq,how,id,au,lic){ EXI.push({n:n,g:g,lv:lv,t:t,mus:mus,eq:eq,how:how,id:id,au:au,lic:lic}) }
-// 深蹲类 sq
-R('高脚杯深蹲','sq',1,'k','股四头肌、臀肌','哑铃','双手抱住哑铃贴近胸前，双脚与肩同宽、膝盖微屈。下蹲到大腿与地面平行，保持背部挺直，髋部向后，膝盖对准脚尖。重心放在脚跟，目视前方或略上方。',203,'ataraxie67','CC-BY-SA 4.0');
-R('哑铃高脚杯深蹲','sq',1,'k','股四头肌、臀肌','哑铃','双手抱住哑铃贴近胸前，双脚与肩同宽、膝盖微屈。下蹲到大腿与地面平行，保持背部挺直，髋部向后，膝盖对准脚尖。重心放在脚跟，目视前方或略上方。',203,'ataraxie67','CC-BY-SA 4.0');
-R('哑铃深蹲','sq',1,'k','股四头肌、臀肌','哑铃','','','','');
-R('徒手深蹲','sq',0,'k','股四头肌、臀肌','徒手','','','','');
-R('相扑深蹲','sq',0,'k','臀肌、股四头肌','徒手','双脚比肩宽，脚尖外开约 45°。保持背部挺直，屈膝屈髋缓慢下蹲，像要坐下去，下到大腿与地面平行，再蹬地站起。',632,'sophialj','CC-BY-SA 4.0');
-R('抱头深蹲','sq',0,'k','臀肌、股四头肌','徒手','双脚与髋同宽、脚尖朝前，挺胸，双手放在脑后、手指轻扣、肘朝两侧。髋部向后推、屈膝，上身尽量保持直立。膝盖向外推，不能向内扣。',1208,'lxmx','CC-BY-SA 4.0');
-R('慢速深蹲','sq',0,'k','股四头肌、臀肌','徒手','用节奏控制来增加肌肉张力：3 秒慢慢下蹲，在底部停 1 秒，再用正常速度站起。挺胸，重心放在脚跟。',1963,'Anon#2','CC-BY-SA 4.0');
-R('靠墙静蹲','sq',0,'k','大腿前后侧','徒手','背靠平整的墙，慢慢下滑并让双脚离墙，直到大腿与地面平行、膝和髋大约成 90°。双臂交叉放胸前，保持 30 秒。',718,'Blablabla','CC0');
-R('腿举','sq',2,'k','股四头肌','腿举器械','腿举是用双腿把重量推离身体的负重训练。',371,'BFad07','CC0');
-// 单腿、箭步类 lg
-R('哑铃反向箭步蹲','lg',1,'k','臀肌、腘绳肌、股四头肌','哑铃','双手各持一只哑铃，向后迈一大步成箭步姿势，再回到站立。主要练臀肌、大腿后侧和前侧。',1651,'AlucardEvil40','CC-BY-SA 4.0');
-R('反向箭步蹲','lg',0,'k','臀肌、腘绳肌、小腿','徒手','向后迈步的箭步蹲，对臀部、大腿后侧和小腿肌群的刺激更多。',1102,'clafal','CC-BY-SA 4.0');
-R('哑铃保加利亚分腿蹲','lg',1,'k','臀肌、股四头肌','哑铃、长凳','后脚踩在高处（如长凳），用前腿做单腿下蹲。抬高后腿会增加不稳定性和动作幅度。',1706,'AlucardEvil40','CC-BY-SA 4.0');
-R('上台阶','lg',0,'k','臀肌、股四头肌','椅子','面对椅子站立，踏上椅子，再退下来，重复。',981,'','CC-BY-SA 4.0');
-// 臀部与髋 gl
-R('臀桥','gl',0,'','臀肌','徒手','仰卧，屈髋屈膝，双脚踩地。抬起臀部，让肩、髋、膝成一条直线。想加大强度，可以把脚垫高到台阶或长凳上。',265,'tdprice12','CC-BY-SA 4.0');
-R('单腿臀桥','gl',0,'','臀肌','徒手','摆好臀桥姿势，用脚跟支撑，交替把一条腿伸直。全程让髋部尽量保持伸展。',1906,'cybro','CC-BY-SA 4.0');
-R('负重臀桥','gl',1,'','臀肌','哑铃','坐在地上，把哑铃放在髋部，向上顶髋并夹紧臀肌。练臀肌，也有助改善髋部活动度。',1642,'AlucardEvil40','CC-BY-SA 4.0');
-R('臀推','gl',2,'','臀肌','长凳','','','','');
-R('单腿哑铃臀推','gl',2,'','臀肌','长凳、哑铃','上背靠在长凳上，一条腿抬起，另一条腿伸展髋部，单侧孤立收缩臀肌。左右分开练，对臀肌刺激更充分。',1234,'carlos3c','CC-BY-SA 4.0');
-R('弹力带臀部后踢','gl',1,'','臀肌','弹力带','四点跪姿，把弹力带固定在脚上，脚跟向后、向上踢，顶端夹紧臀肌。核心保持稳定，背部保持平直。',1613,'Tierrasverdes','CC-BY-SA 4.0');
-R('哑铃驴子踢腿','gl',1,'','臀肌、腘绳肌','哑铃、垫子','在垫子上四点跪姿，手在肩的正下方、膝在髋的正下方，用哑铃增加阻力，向后上方踢腿。主要练臀肌和大腿后侧。',1616,'Tierrasverdes','CC-BY-SA 4.0');
-R('跪姿后踢腿','gl',0,'','臀肌','徒手','四点跪姿，一只脚向后蹬直，注意力放在臀肌上。停 1 秒再回到起点，左右交替。',990,'','CC-BY-SA 4.0');
-R('器械臀部后踢','gl',2,'b','臀肌','器械','用脚跟发力，不要用脚尖。顶端不要过度反弓下背。',1723,'barry','CC-BY-SA 4.0');
-R('蚌式开合','gl',0,'','臀肌、核心','徒手','摆成侧撑姿势（前臂和肘撑地，双腿略弯）。双脚靠拢，抬起上方的膝盖，像贝壳张开，再慢慢回到起点。核心保持稳定，髋部对齐。',1823,'teus_ergaster','CC-BY-SA 4.0');
-R('弹力带蚌式开合','gl',1,'','臀肌、核心','弹力带','动作同蚌式开合，另外在膝盖上方的大腿间套一根对折的弹力带。',1842,'Croak6728','CC-BY-SA 4.0');
-R('侧卧髋外展','gl',0,'','臀肌（髋外侧）','徒手','侧卧，上方的腿伸直、下方的腿屈膝支撑。把上方的腿抬离地面，在顶端停一下。',1202,'wakanda90','CC-BY-SA 4.0');
-R('反向蚌式开合','gl',0,'','臀肌','徒手','侧卧，屈髋屈膝，两膝上下叠放。先让双脚并拢、两膝保持贴合，抬起上方的脚，再慢慢放下。动作只来自髋部，不要让骨盆向后翻。幅度小、控制好，重点是髋部旋转。',2448,'TobiasFalk','CC-BY-SA 4.0');
-R('器械髋外展（坐姿）','gl',2,'','臀肌','器械','坐进器械，背靠垫子；大腿内侧抵住阻力垫，调整座位让髋关节对准器械转轴。从双腿并拢或略压住垫子开始，慢慢向外分开。',1748,'Tierrasverdes','CC-BY-SA 4.0');
-// 髋铰链 hg
-R('哑铃罗马尼亚硬拉','hg',1,'b','腘绳肌、臀肌','哑铃','双手各持一只哑铃，在髋部向前屈，保持背部挺直，再回到站立。主要练大腿后侧和臀肌。',1652,'AlucardEvil40','CC-BY-SA 4.0');
-R('罗马尼亚硬拉','hg',2,'b','腘绳肌、臀肌','哑铃或杠铃','','','','');
-R('早安式','hg',0,'b','腘绳肌','徒手','双脚比肩宽，双手放在髋部。从髋部折叠，上身向地面前倾，背部保持挺直，再回到站立。',1392,'captive0592','CC-BY-SA 4.0');
-R('腿弯举','hg',2,'','腘绳肌','器械','腿弯举（也叫腘绳肌弯举）是孤立练大腿后侧的动作：在阻力下把小腿弯向臀部。',364,'BFad07','CC0');
-R('俯卧腿弯举','hg',2,'','腘绳肌','器械','','','','');
-// 水平推 hp
-R('标准俯卧撑','hp',0,'s','胸肌、手臂、肩','徒手','从平板支撑姿势开始，手比肩略宽，双脚并拢，从头到脚成一条直线。收紧核心，屈肘放低身体，再推回起点。',1551,'Settebello','CC-BY-SA 4.0');
-R('跪姿俯卧撑','hp',0,'s','胸肌、肩','徒手','双膝并拢跪地，双手在身前略比肩宽、位于肩的正下方，身体从头到膝成一条直线。屈肘降低躯干，躯干保持稳定，膝盖不离地，再用手推地回到起点。',1218,'PaukOne','CC-BY-SA 4.0');
-R('上斜俯卧撑（手扶椅子）','hp',0,'s','胸肌、三头肌','椅子或长凳','上半身抬高，主要练胸肌，同时练到三头肌、肩和核心。与标准俯卧撑相比，三头肌参与较少。',1111,'anon1337','CC-BY-SA 4.0');
-R('哑铃地板卧推','hp',1,'s','胸肌','哑铃','双手持哑铃仰卧，屈膝、双脚踩地（有长凳可以用）。把哑铃推起到肘部伸直，再慢慢放下，直到上臂靠近身体并贴到地面，停一下再推起。顶端夹紧胸肌。',1084,'','CC-BY-SA 4.0');
-R('哑铃卧推','hp',2,'s','胸肌','哑铃、长凳','','','','');
-R('胸部推举机','hp',2,'s','胸肌','器械','','','','');
-// 垂直推、侧平举 vp
-R('哑铃肩推','vp',1,'s','肩部','哑铃','坐在长凳上，靠背接近垂直。双手持哑铃举到肩高，手掌和肘全程朝前。向上推起，最高点哑铃靠近但不碰到，再慢慢放下重复。',567,'wger.de','CC-BY-SA 3.0');
-R('哑铃推肩','vp',1,'s','肩部','哑铃','坐在长凳上，靠背接近垂直。双手持哑铃举到肩高，手掌和肘全程朝前。向上推起，最高点哑铃靠近但不碰到，再慢慢放下重复。',567,'wger.de','CC-BY-SA 3.0');
-R('哑铃侧平举','vp',1,'s','肩部（三角肌）','哑铃','练三角肌。手臂伸直或微屈，把哑铃向两侧抬到约与肩同高。身体略向前倾，髋和膝微屈。',348,'wger.de','CC-BY-SA 3.0');
-// 水平拉 hr
-R('哑铃俯身划船','hr',1,'b','背阔肌','哑铃','双手各持一只哑铃，髋部折叠、臀向后推，上身与地面约成 45–75°，膝盖微屈。哑铃垂在肩下，手臂伸直，背保持平直、挺胸、核心收紧，不要弓背。再把哑铃拉向肋骨或髋的方向。',2669,'karthikrrk','CC-BY-SA 4.0');
-R('哑铃单臂划船','hr',1,'b','背阔肌','哑铃','俯身直到手垂在膝盖以下，上身角度保持不变。收紧背阔肌，把肘向后拉并夹紧肩胛。每一次都不要站起来，手要低于膝盖。',81,'sebk','CC-BY-SA 4.0');
-R('哑铃单臂划船（扶椅）','hr',1,'b','背阔肌','哑铃','俯身直到手垂在膝盖以下，上身角度保持不变。收紧背阔肌，把肘向后拉并夹紧肩胛。每一次都不要站起来，手要低于膝盖。',81,'sebk','CC-BY-SA 4.0');
-R('胸托哑铃划船','hr',2,'','背阔肌、二头肌','可调长凳、哑铃','把可调长凳调到 45°，俯卧，头悬在凳沿上方。双手各持哑铃，核心和背阔肌收紧、肩部中立。向上腹部方向划，顶端夹紧背部，再放回起点。',1283,'carlos3c','CC-BY-SA 4.0');
-R('弹力带坐姿划船','hr',1,'','背阔肌','弹力带','坐在地上，双腿伸直、背挺直。弹力带绕过双脚脚掌，双手各握一端，手臂伸直、膝微屈。让肘直直向后，把弹力带拉向下肋，夹紧肩胛。挺胸，躯干不要后仰借力。',2635,'trs1800','CC-BY-SA 4.0');
-R('坐姿划船','hr',2,'','背阔肌','绳索器械','坐在器械上双脚踩稳，比肩略宽。脚跟蹬地、夹紧臀部，握住把手，坐直、膝微屈。收紧腹部和下背，让躯干垂直于地面。肩膀往后往下沉，划船时夹紧肩胛，想象两肩胛间夹着一支铅笔。',1117,'Franpol','CC-BY-SA 4.0');
-// 垂直拉 vr
-R('高位下拉','vr',2,'','背阔肌','绳索器械','起始双臂在头上伸直，感觉背阔肌被拉伸，肩膀下沉、不要耸肩。拉的时候让肘向下向后带，把横杆拉到上胸或锁骨附近。挺胸，底部夹紧肩胛。',723,'tuckerm','CC-BY-SA 3.0');
-// 肩后束与上背 rd
-R('弹力带面拉','rd',1,'','上背、肩后束','弹力带','站姿水平拉。握住弹力带到脸的高度，让肘抬高并向外，朝脸的方向拉，同时夹紧肩胛。练上背和肩后束，有助改善体态。',1732,'54str','CC-BY-SA 4.0');
-R('弹力带拉开','rd',1,'','上背、肩后束','弹力带','双手握住弹力带，手臂在身前伸直、与肩同高，肘微屈并固定。向两侧拉开直到弹力带接近胸口，再缓慢回到起点，控制张力。',1380,'schwolfar','CC-BY-SA 4.0');
-R('绳索面拉','rd',2,'','上背、肩后束','绳索器械','','','','');
-R('俯卧W字','rd',0,'','上背、肩后束','徒手','','','','');
-R('胸托后束飞鸟（Y 字）','rd',2,'','肩后束','可调长凳、轻哑铃','把上斜凳调到 30–45°，胸贴凳面俯卧，头保持中立或略朝下，避免颈部压力。手握轻哑铃、掌心相对（拇指朝上）。手臂伸直或微屈，向上向外举成“Y”字。动作要来自肩和肩胛，不要用身体甩。',1825,'beagle','CC-BY-SA 4.0');
-R('哑铃俯身面拉','rd',1,'b','上背、肩','哑铃','用哑铃做俯身面拉，练上背和肩。把重量拉向脸部，肘保持高位，夹紧肩胛。',1639,'AlucardEvil40','CC-BY-SA 4.0');
-// 三头、二头
-R('哑铃俯身臂屈伸','tr',1,'s','三头肌','哑铃','双手各持一只哑铃，掌心相对躯干。背挺直、膝微屈，髋部前屈，躯干接近与地面平行，抬头。上臂紧贴躯干并与地面平行，前臂垂向地面、肘约成 90°，再向后伸直前臂。',655,'bodybuilding.com','CC-BY-SA 3.0');
-R('哑铃臂屈伸','tr',1,'s','三头肌','哑铃','要点：肘部固定，肌肉主动发力，不借惯性，动作受控且缓慢，不要过度伸直。',1336,'Anastasious','CC-BY-SA 4.0');
-R('绳索三头下压','tr',2,'','三头肌','绳索器械','常见的三头肌动作，容易学。通常做 8–12 次或更多，放在上肢或手臂训练日里。',805,'cshep442','CC-BY-SA 4.0');
-R('哑铃弯举','bi',1,'','二头肌','哑铃','','','','');
-// 核心 core
-R('平板支撑','core',0,'','核心','徒手','前臂和脚尖撑地，手臂弯曲、肘在肩的正下方。身体全程保持一条直线，尽量久地保持。想加大难度，可以抬起一只手臂或一条腿。',458,'YYCfit / BFad07','CC-BY-SA 3.0');
-R('侧平板支撑','core',0,'','腹斜肌','徒手','练腹斜肌，帮助稳定脊柱。侧躺，用前臂和膝到脚的一侧撑起身体。',580,'bodybuilding.com','CC-BY-SA 4.0');
-R('鸟狗式','core',0,'','核心、背部','徒手','核心稳定动作，提升平衡、协调和脊柱对位，冲击小。四点跪撑，手在肩下、膝在髋下，保持脊柱中立。右臂向前、左腿向后同时伸出，髋部保持端正，到最远处稍停。',1572,'Settebello','CC-BY-SA 4.0');
-R('死虫','core',0,'','腹肌','徒手','仰卧，下背压向地面。对侧的手和脚缓慢伸出，脊柱保持中立，平稳呼吸。受控地收回，不要弓腰。',2752,'ruochenma','CC-BY-SA 4.0');
-R('超人式','core',0,'b','下背、臀肌','垫子','俯卧，手臂向前伸直、双腿伸直放平。同时抬起手臂和双腿，像在飞，收紧下背，保持呼吸。按能力每次保持 2–5 秒。',636,'baldurmen','CC-BY-SA 4.0');
-R('反向卷腹','core',0,'','腹肌','徒手','仰卧，手放在臀部附近。抬腿，到大约七成高度时骨盆也可以跟着抬起。顶端停 1–2 秒，再回到起点。',1772,'eufvksruh','CC-BY-SA 4.0');
-R('帕洛夫推（抗旋转）','core',1,'','核心','弹力带或绳索','抗旋转动作，训练脊柱周围的大小肌群去抵抗旋转。侧身站在固定点旁，双手握住把手或弹力带，躯干正对前方，把手收到胸口中央，慢慢向前推出，再慢慢收回。',1194,'prevail90','CC-BY-SA 4.0');
-// 小腿 calf
-R('站姿提踵','calf',0,'','小腿','徒手','','','','');
-R('哑铃提踵','calf',1,'','小腿','哑铃','双手各持一只哑铃，手臂自然下垂，双脚与髋同宽。想加大幅度，可以让前脚掌踩在台阶上。踮脚尽量抬高并稍停，再慢慢放下脚跟，直到小腿有拉伸感。膝盖微屈、不要锁死，上身保持直立。',2661,'','CC-BY-SA 4.0');
-
-// ---- 徒手动作扩充（wger）----
-R('椅子深蹲','sq',0,'k','臀肌、股四头肌','椅子或箱子','在身后放一把椅子（或箱子），高度要让你下蹲时能用臀部轻触到它，同时背部保持挺直。双脚与肩同宽、脚尖略外开，收紧核心、背部中立。像要坐到椅子上一样，向后坐、屈膝屈髋，让髋部下沉到椅面。',977,'clafal','CC-BY-SA 4.0');
-R('正向箭步蹲','lg',0,'k','臀肌、股四头肌','徒手','站直，背挺直。左腿向前迈一大步，降低骨盆直到右膝几乎碰到地面，再抬起骨盆，退回一步回到起点。左右腿交替。',984,'','CC-BY-SA 4.0');
-R('分腿蹲','lg',0,'k','臀肌、股四头肌','徒手','站直，背挺直，左腿向前迈一大步。降低骨盆，直到右膝几乎碰到地面，再抬起，重复。做完一侧再换另一侧。',991,'','CC-BY-SA 4.0');
-R('侧向分腿蹲','lg',0,'k','大腿、臀部','徒手','站直，向侧面迈一大步，比肩略宽。弯曲一侧的膝盖，让大腿与地面平行，弯曲的膝盖要与脚尖在同一方向。再推回起点，重复。',986,'','CC-BY-SA 4.0');
-R('哥萨克深蹲','lg',0,'k','腿部、臀部','徒手','哥萨克深蹲是多关节动作，主要练腿和臀，也需要稳定肌肉参与，能练力量、灵活性和稳定性。',1407,'clafal','CC-BY-SA 4.0');
-R('扶椅分腿蹲','lg',0,'k','股四头肌','椅子或墙','前后分腿站，前脚在后脚前约一步，手扶稳固的支撑物（墙或椅背）。双膝弯曲让髋部垂直下降，直到后膝几乎碰到地面。上身保持直立，前脚脚跟着地，再用前脚发力推起。支撑物只用来保持平衡，不要靠它拉起身体。一侧做完再换另一侧。',2557,'','CC-BY-SA 3.0');
-R('站姿抬腿（髋稳定）','gl',0,'','髋周围肌群','徒手','上身保持稳定，主要用一条腿站立，另一条腿不负重，反复抬起、在髋和膝处弯曲，再放下。两侧都做。这个动作练的是髋部周围肌群的稳定性。',1096,'tregga','CC-BY-SA 4.0');
-R('宽距俯卧撑','hp',0,'s','胸肌外侧、肩','徒手','双手比肩宽，增加对胸外侧和肩的刺激。下放到胸部几乎碰地，核心收紧，再用手掌发力推起。不要塌腰，保持从头到脚一条直线。',1964,'Anon#2','CC-BY-SA 4.0');
-R('钻石俯卧撑','hp',0,'s','胸肌、三头肌','徒手','平板支撑姿势，双手靠近放在胸下，拇指和食指围成菱形。屈肘让胸向双手下降，身体保持一条直线，再推起到手臂完全伸直。肘靠近身体，核心收紧。',386,'notdefine','CC-BY-SA 4.0');
-R('三头肌俯卧撑','tr',0,'s','三头肌','徒手','针对三头肌的俯卧撑。平板支撑姿势，双手在肩的正下方，双脚并拢。下降时让肘夹在身体两侧、上臂指向正后方，降到胸部碰地再回到起点。',2684,'JuustoKakku','CC-BY-SA 4.0');
-R('三点支撑俯卧撑','hp',0,'s','胸肌、核心','徒手','摆好俯卧撑姿势，肩在手的正上方，双脚与髋同宽。肚脐向脊柱收，收紧腹肌。左脚抬离地面约 5 厘米，脚尖朝下，髋部不要动，从头到脚始终成一条直线。然后屈肘，让胸部降到接近地面，再推起。换另一侧重复。',1209,'lxmx','CC-BY-SA 4.0');
-R('站姿 T/Y/I 举臂','rd',0,'s','肩、上背','徒手','站直，双脚与髋同宽，核心收紧，手臂放松垂在身侧。依次做三种举臂：T 举（手臂向两侧伸直举到与地面平行）、Y 举（手臂向上约 45°举成 Y 字）、I 举（手臂并拢举过头顶成 I 字）。保持脊柱中立，不要反弓下背。',1606,'WiNNiE','CC-BY-SA 4.0');
-R('YTW 举臂','rd',0,'s','肩胛之间的肌群','徒手','YTW 动作用来强化两肩胛之间的肌肉，帮助把肩往后收，保持挺拔的体态。',2454,'probablyforging','CC-BY-SA 4.0');
-R('蝴蝶超人式','core',0,'b','上背、后颈','垫子','俯卧，十指交叉放在脑后，抬起头，并把双肘尽量向上抬。',1908,'cybro','CC-BY-SA 4.0');
-R('跪姿对侧超人式','core',0,'','臀肌、大腿后侧、肩','徒手','四点跪姿，一只脚向后蹬直，直到整条腿伸直，脚要抬高、像被向后拉。手臂向前伸直，注意肩要抬高。单侧静态保持。',1910,'cybro','CC-BY-SA 4.0');
-R('高位平板支撑','core',0,'s','核心','徒手','手和脚尖触地，背、手臂和腿都伸直。可以先趴在地上，双手掌心朝下放在头两侧，再把手臂撑直到这个位置。全程保持起始姿势。',1001,'','CC-BY-SA 4.0');
-R('平板支撑伸手','core',0,'s','核心','徒手','摆成平板支撑，眼睛看地面。一只手向前抬起再收回，换另一只手。抬起和收回都要慢，身体尽量保持不动。',1766,'','CC-BY-SA 4.0');
-R('平板支撑拍肩','core',0,'s','核心、肩','垫子','摆成标准平板支撑，双脚比肩略宽。交替抬起一只手，去触碰对侧的肩膀。',1091,'clafal','CC-BY-SA 4.0');
-R('动态侧平板支撑','core',0,'','腹斜肌','徒手','侧躺，用一侧的肘和脚的外侧撑起身体，让髋部上下起落，同时身体保持一条直线。',1288,'painDpice','CC-BY-SA 4.0');
-R('自行车卷腹','core',0,'','腹肌、腹斜肌','垫子','仰卧，手放在脑后，双腿伸直。让肩膀离地，一侧膝盖收向胸口，同时转体，让对侧的肘去碰膝盖。左右交替，像蹬自行车一样。动作要受控，核心全程发力。',1412,'hpmbala','CC-BY-SA 4.0');
-R('抬腿卷腹','core',0,'','腹肌','垫子','仰卧，双腿笔直向上举。用双手去够脚尖，同时让肩胛骨离开地面，再放回。',174,'krisbbb','CC-BY-SA 4.0');
-R('悬停卷腹','core',0,'','上腹','垫子','仰卧，双脚平放在地上，双臂交叉放在头上、手在脑后。抬起上身，让肩胛骨离开地面，在顶端停 1–2 拍。尽量让上腹发力，保持质量，做 10 次。目标是上身动、下半身不动。',1478,'Moffi','CC-BY-SA 4.0');
-R('站姿侧屈卷腹','core',0,'','腹斜肌','徒手','站直，双脚与肩同宽，手放脑后。上身向一侧倾，收缩腹斜肌，让肘靠近髋。回到起点后左右交替，或做完一侧再换另一侧。这个动作能练腹斜肌，同时改善平衡与稳定。',1426,'hpmbala','CC-BY-SA 4.0');
-R('单腿提踵','calf',0,'','小腿','台阶（可选）','站在地面或台阶边缘（台阶能加大活动幅度）。抬起一只脚，把脚跟抬高到踮脚站立，在顶端停 3 秒。慢慢放下脚跟，直到几乎碰到地面，不要砸下去。',1021,'','CC-BY-SA 4.0');
-// ---- 热身与拉伸 st ----
-R('儿童式','st',0,'','背部、髋、大腿','垫子','四点跪姿，膝盖、脚趾和双手着地，两只大脚趾相碰。把膝盖分开到与髋同宽。呼气时让骨盆向后，坐到脚跟上，双手仍贴地。上身放松，前额放到地面，双手自然向前滑。保持这个姿势。要出这个姿势，先把手走回到肩的正下方，再把上身抬起坐直。',1002,'','CC-BY-SA 4.0');
-R('站姿小腿拉伸','st',0,'','小腿','墙或椅子','拉伸小腿肌（腓肠肌），随处都能做，只要有一面墙或一把椅子。',1239,'erikocobra','CC-BY-SA 4.0');
-R('三头肌拉伸','st',0,'','三头肌','徒手','一只手放在背后，用另一只手抓住这只手的肘，轻轻往下拉。保持几秒，再换另一侧。',1230,'Lynn_McIntyre','CC-BY-SA 4.0');
-R('肩部绕环','st',0,'','肩关节','徒手','坐着或站着，背挺直。双手放在肩上，以中等速度反复转动两侧肩关节，画圆。',1004,'','CC-BY-SA 4.0');
-R('手臂绕环','st',0,'','肩、手臂','徒手','站直，背挺直。手臂保持伸直，从身前向下、绕到背后、再越过头顶回到原位，然后连续画圆。',994,'','CC-BY-SA 4.0');
-// ---- 女性常练：臀腿、髋、体态、手臂、核心（wger）----
-R('弹力带四点跪姿髋外展','gl',1,'','臀肌、髋外侧','弹力带','四点跪姿，体重均匀分在双膝和双手上。躯干保持稳定，收紧腹部，腰椎保持挺直、不要扭转（想象下背上放着一杯水，不会倒）。把一条腿向外侧抬起，抬腿时不要扭转。',1915,'treder','CC-BY-SA 4.0');
-R('仰卧髋外展','gl',0,'','臀肌、髋外侧','垫子','仰卧在垫子上，双腿伸直放松，手臂放在身体两侧或向两边展开，帮助稳定。把一条腿轻轻抬离地面（伸直或略弯），再向外侧移动，远离身体中线。',1886,'teus_ergaster','CC-BY-SA 4.0');
-R('哑铃青蛙推髋','gl',1,'','臀肌','哑铃','与臀推相似，但双脚并在一起，让膝盖向外打开成青蛙的姿势，再把臀部抬离地面（用哑铃增加阻力）。',1503,'JohnPreston','CC-BY-SA 4.0');
-R('臀桥单臂哑铃推举','hp',1,'s','臀肌、胸','哑铃','单手持一只哑铃做臀桥。把哑铃举在胸口上方，这是每次的起始位置。放下哑铃，让肘碰到地面（如果用长凳，肘大约低于肩 45°），再把哑铃推回起始位置。',1686,'meldun','CC-BY-SA 4.0');
-R('哑铃俯身侧抬肘（后束）','rd',1,'b','肩后束、上背','哑铃','双手各持一只哑铃，髋部前屈，让背接近与地面平行，手臂自然下垂并与肩在同一条线上。屈肘，把肘向两侧抬起，直到上臂与地面平行，再慢慢放回，重复。',1227,'Lynn_McIntyre','CC-BY-SA 4.0');
-R('哑铃过头臂屈伸（双手握）','tr',1,'s','三头肌','哑铃','把一只哑铃举过头，双手托在内侧垫片下（像捧着一颗心的握法）。肘在头的上方，屈肘让前臂落到上臂后面。底部要注意别让哑铃撞到颈后。再伸直手肘，把哑铃举回头顶。',211,'tuninx','CC-BY-SA 3.0');
-R('站姿宽距早安式','hg',0,'b','大腿后侧','徒手','双脚比肩宽，脚尖略向外，双手放在脑后。髋部折叠，让上身向地面下降，背保持挺直、胸打开。',1397,'captive0592','CC-BY-SA 4.0');
-R('空心支撑','core',0,'','腹肌','垫子','在垫子上仰卧，收紧腹肌，伸直手臂和双腿并抬起（头和肩膀也离地）。保持下背始终贴住垫子。',297,'Behrooz','CC0');
-R('仰卧交替打腿','core',0,'b','下腹','垫子','仰卧，把伸直的双腿抬离地面约 45°。一只脚向下、几乎碰到地面时，另一只脚尽量抬到 90° 或接近。再换脚，交替进行。',235,'nate303303','CC-BY-SA 4.0');
-R('手撑地前走','core',0,'s','核心、肩','徒手','站姿，膝盖微屈，双手放在地上。从这个姿势开始，用双手向前走，同时保持臀部收紧、下背不要失控。',1103,'clafal','CC-BY-SA 4.0');
-R('内收肌后坐拉伸','st',0,'','大腿内侧','徒手','四点跪姿，双手在肩的正下方、双膝在髋的正下方。一条腿向侧面伸直，脚掌平放、脚尖朝前。背保持平直，慢慢把髋部向后推向跪着那条腿的脚跟，直到感觉到拉伸。',2614,'','CC-BY-SA 4.0');
-R('90/90 髋转换','st',0,'','髋、臀','徒手','坐在地上，一条腿在身前弯成 90°，另一条腿在侧面弯成 90°，让后面的小腿与前面的小腿平行。上身保持直立，可以的话手不要撑地。把双膝一起转向另一侧，让两条腿互换位置。',2613,'','CC-BY-SA 4.0');
-R('髋屈肌拉伸','st',0,'','髋前侧、大腿前侧','徒手','跪成箭步姿势，一膝着地、另一只脚在前，双手叉腰。躯干保持直立，收紧后腿一侧的臀部，把髋部向前推，直到髋前侧和大腿前侧有拉伸感。保持一会，再换边。',1867,'Davidgj32','CC-BY-SA 4.0');
-R('髋部交叉拉伸','st',0,'','髋、臀、下背','垫子','仰卧，手臂向两侧伸展，双腿并拢屈膝。把双膝慢慢倒向一侧，同时让肩膀和手臂保持贴地，你会在髋、臀和下背感到拉伸。稍停，把膝盖带回中间，再换另一侧。',1863,'Davidgj32','CC-BY-SA 4.0');
-R('蝴蝶式拉伸','st',0,'','大腿内侧、髋','徒手','坐成祈祷姿势，双脚脚底轻轻相贴。用手慢慢把双脚拉向腹股沟，按需要保持。',1843,'Croak6728','CC-BY-SA 4.0');
-R('青蛙式拉伸','st',0,'','臀、髋','垫子','四点跪姿，把膝盖向外打开，降低到用前臂撑地。肘和膝不动，开始前后摇动，让臀部尽量靠近脚。',1844,'Croak6728','CC-BY-SA 4.0');
-R('台阶小腿拉伸','st',0,'','小腿','台阶、墙或栏杆','站在台阶或稳固的高处，前脚掌踩在边缘，脚跟悬空，扶着栏杆或墙保持平衡。让一只或双脚的脚跟降到低于台阶，感到小腿被拉伸并保持。膝盖伸直时，拉伸的是小腿的腓肠肌。',2666,'trs1800','CC-BY-SA 4.0');
-const WOMEN = ['臀桥','单腿臀桥','负重臀桥','单腿哑铃臀推','哑铃青蛙推髋','弹力带臀部后踢','哑铃驴子踢腿','跪姿后踢腿','蚌式开合','弹力带蚌式开合','反向蚌式开合','侧卧髋外展','仰卧髋外展','弹力带四点跪姿髋外展','器械髋外展（坐姿）','站姿抬腿（髋稳定）','相扑深蹲','抱头深蹲','反向箭步蹲','哥萨克深蹲','弹力带面拉','弹力带拉开','站姿 T/Y/I 举臂','YTW 举臂','胸托后束飞鸟（Y 字）','哑铃俯身侧抬肘（后束）','三头肌俯卧撑','哑铃臂屈伸','哑铃过头臂屈伸（双手握）','死虫','鸟狗式','侧平板支撑','动态侧平板支撑','空心支撑','自行车卷腹','站姿侧屈卷腹','儿童式','90/90 髋转换','髋屈肌拉伸','髋部交叉拉伸','蝴蝶式拉伸','青蛙式拉伸','内收肌后坐拉伸'];
-const EXM = {}; EXI.forEach(function(x){ if(!EXM[x.n]) EXM[x.n]=x });
+/* 傷病過濾後動作不夠時，依序補上的安全動作（都不在任何不適部位清單） */
+const SAFE = ['臀桥','鸟狗式','死虫','平板支撑','侧平板支撑','蚌式开合'];
+/* 以「秒」計的動作（名稱開頭比對） */
 const TIMED = ['平板支撑','侧平板支撑','靠墙静蹲'];
+/* 運動基礎 → [組數, 次數, 組間休息] */
 const REPS = {new:['2','12–15','60–90 秒'],some:['3','10–15','60–90 秒'],reg:['3–4','8–12','90 秒']};
+/* 重點部位 → 動作類別 */
 const FOCUS_G = {hips:['gl'],abs:['core'],arms:['tr','bi'],posture:['rd']};
-function focusList(A,i,dayEx){
-  const areas=(A.focus||[]).filter(function(x){ return FOCUS_G[x] });
-  if(!areas.length) return [];
-  const PL={gym:2,home:1,body:0}[A.place], out=[];
-  for(let k=0;k<2;k++){
-    const gs=FOCUS_G[areas[(i+k)%areas.length]];
-    const pool=[]; EXI.forEach(function(x){ if(gs.indexOf(x.g)>=0 && x.lv<=PL && !(x.t && A.injury.indexOf(x.t)>=0) && pool.indexOf(x.n)<0) pool.push(x.n) });
-    const free=pool.filter(function(n){ return dayEx.indexOf(n)<0 && out.indexOf(n)<0 });
-    if(free.length) out.push(free[(i+k*2)%free.length]);
-  }
-  return out;
-}
-function workout(A){
-  const n = {30:4,45:5,60:6}[A.mins];
-  const lib = LIB[A.place];
-  const sw = A.sw || {};
-  return SCHED[A.days].map(([key,title],i)=>{
-    const day = WK[A.days][i];
-    if(key==='cardio') return {day,title,cardio:true};
-    let list = lib[key].filter(([nm,t])=>!t || !A.injury.includes(t)).map(x=>x[0]);
-    for(const s of SAFE){ if(list.length>=n) break; if(!list.includes(s)) list.push(s) }
-    list = list.slice(0,n).map((nm,j)=> sw[i+'-'+j] || nm);
-    return {day,title,ex:list,focus:focusList(A,i,list)};
-  });
-}
-function exLine(nm,A){
-  const [sets,reps] = REPS[A.exp];
-  if(TIMED.some(t=>nm.startsWith(t))) return sets.split('–')[0]+' 组 × 20–40 秒';
-  if(nm.startsWith('站姿提踵')||nm.startsWith('哑铃提踵')) return sets+' 组 × 15–20 次';
-  if(/死虫|鸟狗式|超人式|俯卧W字|蚌式|后踢|驴子踢腿|侧卧髋外展|帕洛夫|单腿臀桥/.test(nm)) return sets+' 组 × 每侧/每次 8–12 次';
-  if(/箭步|分腿蹲|上台阶|单臂|单腿/.test(nm)) return sets+' 组 × 每侧 '+reps+' 次';
-  return sets+' 组 × '+reps+' 次';
-}
+/* 動作庫：類別顯示名稱與顯示順序 */
+const GL = {sq:'深蹲类',lg:'箭步与单腿',gl:'臀部与髋',hg:'大腿后侧',hp:'推（胸）',vp:'肩部',hr:'划船（背）',vr:'下拉（背）',rd:'上背与肩后束',tr:'三头肌',bi:'二头肌',core:'核心',calf:'小腿',st:'热身与拉伸'};
+const GORDER = ['sq','lg','gl','hg','hp','vp','tr','bi','hr','vr','rd','core','calf','st'];
+</script>
+<script>
+/* ==== src/js/data-foods.js ==== */
+/* 食物資料與飲食範本（純資料，沒有邏輯）。以下來源說明為原版註解，原樣保留。 */
 
 /* ================= 食物库 =================
    营养数据来自美国农业部 FoodData Central（SR Legacy，公有领域），每 100 克可食部分；
@@ -455,24 +478,139 @@ const FOODS = [
   {c:'坚果与油脂',n:'橄榄油',k:884,p:0.0,cb:0.0,f:100.0,t:'',u:4.5,us:'1 茶匙约 4.5 g',ck:'炒菜少放一点',fdc:171413}
 ];
 
-/* ================= 饮食 ================= */
-const PROT = {
- omni:[['鸡胸肉（香煎或水煮）',0],['虾仁（清炒）',1],['瘦牛肉（少油快炒）',0],['清蒸鱼',1],['番茄炒蛋',0],['家常豆腐',0],['去皮鸡腿肉',0]],
- veg:[['番茄炒蛋',0],['家常豆腐',0],['香干炒时蔬',0],['毛豆炒蛋',0],['菌菇豆腐煲',0],['蒸蛋羹',0],['豆腐皮拌菜',0]]
-};
-const CARB = ['杂粮饭','糙米饭','蒸红薯','玉米','荞麦面','蒸土豆','燕麦饭'];
-const VEG = ['西兰花','清炒青菜','凉拌黄瓜','炒菠菜','番茄','香菇小油菜','清炒生菜'];
-const BRK = [
- {t:'水煮蛋 + 全麦面包 + 无糖豆浆',d:0},{t:'燕麦 + 牛奶 + 蓝莓或香蕉',d:1},{t:'玉米 + 水煮蛋 + 黄瓜',d:0},
- {t:'蒸红薯 + 水煮蛋 + 无糖酸奶',d:1},{t:'杂粮粥 + 蒸蛋 + 凉拌青菜',d:0},{t:'全麦三明治（蛋 + 生菜）+ 无糖豆浆',d:0},{t:'豆浆燕麦 + 水煮蛋 + 苹果',d:0}
-];
-const SNK = [
- {t:'无糖酸奶 + 一小把坚果',d:1},{t:'苹果或橙子 + 茶叶蛋',d:0},{t:'无糖豆浆 + 全麦饼干两片',d:0},
- {t:'香蕉 + 一小把杏仁',d:0},{t:'即食玉米 + 无糖豆浆',d:0},{t:'茶叶蛋 + 圣女果',d:0},{t:'无糖酸奶 + 莓类水果',d:1}
-];
-const FM = {}; FOODS.forEach(function(f){ FM[f.n]=f });
+/* 以「個／根／片」顯示份量的食物（份量重量取自 FOODS 的 u） */
 const UW = {'鸡蛋（煮熟）':'个','苹果':'个','香蕉':'根','全麦面包':'片'};
-function g5(x){ return Math.max(5, Math.round(x/5)*5) }
+
+/* 飲食範本的輪替池（menu() 依天數 i 輪流挑選，已排除忌口的會被跳過）；順序有意義，不要重排 */
+const MAINP = ['鸡胸肉（熟）','瘦牛肉（烤熟）','三文鱼（烤熟）','去皮鸡腿肉（烤熟）','鲈鱼（烤熟）','猪里脊（烤熟）','虾（煮熟）','老豆腐（较硬）','鳕鱼（烤熟）','豆腐（普通）'];
+const VEGP = ['老豆腐（较硬）','毛豆（煮熟）','豆腐（普通）','黑豆（煮熟）','鹰嘴豆（煮熟）'];
+const STAPLE = ['糙米饭（煮熟）','白米饭（煮熟）','红薯（烤熟）','土豆（煮熟）','玉米（煮熟）','荞麦面（煮熟）','意面（煮熟）'];
+const BSTAPLE = ['燕麦粥（水煮）','全麦面包','红薯（烤熟）','玉米（煮熟）'];
+const VEGS = ['西兰花（煮熟）','菠菜（煮熟）','小白菜（煮熟）','番茄','黄瓜','生菜（罗马生菜）','胡萝卜（煮熟）','香菇（煮熟）','青椒'];
+const BEXTRA = ['无糖豆浆（低脂）','希腊酸奶（脱脂、原味）','脱脂牛奶'];
+const FRUITS = [['香蕉',136],['苹果',182],['蓝莓',120],['橙子',150],['草莓',150],['苹果',182],['香蕉',136]];
+const SNACKS = [
+  [['希腊酸奶（脱脂、原味）',150],['蓝莓',80]],[['苹果',182],['杏仁',15]],[['香蕉',136],['杏仁',15]],
+  [['无糖豆浆（低脂）',250],['草莓',100]],[['橙子',150],['核桃',15]],[['原味低脂酸奶',150],['草莓',100]],[['苹果',182],['核桃',15]]
+];
+</script>
+<script>
+/* ==== src/js/logic.js ==== */
+/* 純邏輯：熱量計算、訓練排程、換動作、飲食範本、存檔檢查。
+   不碰 DOM，只依賴 data-exercises.js、data-foods.js 定義的全域常數；瀏覽器與 Node 測試（tests/）共用同一份。
+   語法層級刻意維持與原版相同（const/let、箭頭函式），不用 ?. ?? 與 ES module，以相容老版微信 X5/XWeb。 */
+
+/* ---------- 常數 ---------- */
+const GOAL = {fat:'减脂',muscle:'增肌塑形',shape:'改善体态、紧致线条',keep:'保持健康'};
+const PLACE_LV = {gym:2,home:1,body:0};          // 場地 → 可用器材等級上限（動作 lv <= 這個值才能用）
+const ACT_FACTOR = {2:1.35,3:1.45,4:1.55,5:1.6};  // 每週練幾天 → 活動係數
+const SESSION_N = {30:4,45:5,60:6};               // 每次分鐘數 → 每天動作數
+const INJ_NAME = {k:'膝盖',b:'腰背',s:'肩颈'};    // 不適部位代碼 → 顯示名稱
+const EGG = '鸡蛋（煮熟）';
+const MEAL_SHARE = {b:.25,l:.35,d:.30,s:.10};     // 早餐、午餐、晚餐、加餐的熱量/蛋白質比例
+
+/* ---------- 動作資料與索引 ---------- */
+// 由 EXERCISE_ROWS 展開成物件陣列；別名在原動作後緊接著插入一行（只換名稱），順序與舊版逐筆相同。
+function buildExercises(rows){
+  const out=[];
+  rows.forEach(function(r){
+    const x={n:r[0],g:r[1],lv:r[2],t:r[3],mus:r[4],eq:r[5],how:r.length>6?r[6]:'',id:r.length>6?r[7]:'',au:r.length>6?r[8]:'',lic:r.length>6?r[9]:''};
+    out.push(x);
+    if(r[10]){ const y={}; for(const k in x) y[k]=x[k]; y.n=r[10]; out.push(y) }
+  });
+  return out;
+}
+const EXI = buildExercises(EXERCISE_ROWS);
+const EXM = {}; EXI.forEach(function(x){ if(!EXM[x.n]) EXM[x.n]=x });            // 名稱 → 動作
+const EXG = {}; EXI.forEach(function(x){ (EXG[x.g]=EXG[x.g]||[]).push(x) });       // 類別 → 動作（保持 EXI 順序）
+const FOCUS_ROWS = {};                                                              // 重點部位 → 候選動作（保持 EXI 順序；arms 的 tr/bi 交錯順序與舊版相同）
+Object.keys(FOCUS_G).forEach(function(k){ FOCUS_ROWS[k]=EXI.filter(function(x){ return FOCUS_G[k].indexOf(x.g)>=0 }) });
+
+// 這個人能做的動作名稱（依 rows 順序、去重）：器材等級在場地範圍內，且不碰她勾選的不適部位
+function usableNames(rows,A){
+  const lv=PLACE_LV[A.place], names=[];
+  rows.forEach(function(x){ if(x.lv<=lv && !(x.t && A.injury.indexOf(x.t)>=0) && names.indexOf(x.n)<0) names.push(x.n) });
+  return names;
+}
+
+/* ---------- 計算 ---------- */
+function calc(A){
+  const w=A.weight,h=A.height,a=A.age;
+  const bmr = 10*w + 6.25*h - 5*a - 161;            // Mifflin-St Jeor（女）
+  const af = ACT_FACTOR[A.days];
+  const tdee = bmr*af;
+  const bmi = w/Math.pow(h/100,2);
+  const flagged = A.health.some(x=>x!=='none') || a<18;
+  const low = bmi<18.5;
+  let kcal = tdee, mode='维持';
+  if(!flagged){
+    if(A.goal==='fat' && !low){ kcal=Math.max(tdee*0.8,bmr,1200); mode='温和减脂' }
+    else if(A.goal==='shape' && !low){ kcal=tdee*0.95; mode='轻微热量缺口' }
+    else if(A.goal==='muscle'){ kcal=tdee*1.05; mode='轻微盈余' }
+  }
+  kcal = Math.round(kcal/10)*10;
+  const pPerKg = (A.goal==='fat'||A.goal==='muscle') ? 1.8 : 1.5;
+  const p = Math.round(w*pPerKg);
+  const f = Math.round(kcal*0.27/9);
+  const c = Math.max(100, Math.round((kcal-4*p-9*f)/4));
+  const weekly = (kcal-tdee)*7/7700;                  // 约值
+  return {bmr:Math.round(bmr),tdee:Math.round(tdee/10)*10,bmi,flagged,low,kcal,mode,p,f,c,weekly};
+}
+
+/* ---------- 訓練 ---------- */
+// 第 i 天的重點加練：最多 2 個，輪流取她選的部位，避開當天已有的動作
+function focusList(A,i,dayEx){
+  const areas=(A.focus||[]).filter(function(x){ return FOCUS_G[x] });
+  if(!areas.length) return [];
+  const out=[];
+  for(let k=0;k<2;k++){
+    const pool=usableNames(FOCUS_ROWS[areas[(i+k)%areas.length]],A);
+    const free=pool.filter(function(n){ return dayEx.indexOf(n)<0 && out.indexOf(n)<0 });
+    if(free.length) out.push(free[(i+k*2)%free.length]);
+  }
+  return out;
+}
+function workout(A){
+  const n = SESSION_N[A.mins];
+  const lib = LIB[A.place];
+  const sw = A.sw || {};
+  return SCHED[A.days].map(([key,title],i)=>{
+    const day = WK[A.days][i];
+    if(key==='cardio') return {day,title,cardio:true};
+    let list = lib[key].filter(nm=>{ const t=EXM[nm].t; return !t || !A.injury.includes(t) });
+    for(const s of SAFE){ if(list.length>=n) break; if(!list.includes(s)) list.push(s) }
+    list = list.slice(0,n).map((nm,j)=> sw[i+'-'+j] || nm);
+    return {day,title,ex:list,focus:focusList(A,i,list)};
+  });
+}
+// 同類、可做、當天沒有、且不是同一個 wger 動作（別名）的替代動作，從目前動作的下一個開始輪
+function alts(cur,dayEx,A){
+  const m=EXM[cur]; if(!m) return [];
+  const names=usableNames(EXG[m.g],A);
+  const pos=names.indexOf(cur), out=[];
+  for(let k=1;k<=names.length;k++){ const c=names[(pos+k+names.length)%names.length];
+    if(c!==cur && dayEx.indexOf(c)<0 && !(m.id && EXM[c].id===m.id)) out.push(c) }
+  return out;
+}
+// 「换一个」：把第 i 天第 j 個動作換成下一個替代動作，記在 A.sw；沒有替代就回傳 false
+function applySwap(A,i,j){
+  const day=workout(A)[i]; const cur=day.ex[j];
+  const list=alts(cur,day.ex,A); if(!list.length) return false;
+  A.sw=A.sw||{}; A.sw[i+'-'+j]=list[0];
+  return true;
+}
+function exLine(nm,A){
+  const [sets,reps] = REPS[A.exp];
+  if(TIMED.some(t=>nm.startsWith(t))) return sets.split('–')[0]+' 组 × 20–40 秒';
+  if(nm.startsWith('站姿提踵')||nm.startsWith('哑铃提踵')) return sets+' 组 × 15–20 次';
+  if(/死虫|鸟狗式|超人式|俯卧W字|蚌式|后踢|驴子踢腿|侧卧髋外展|帕洛夫|单腿臀桥/.test(nm)) return sets+' 组 × 每侧/每次 8–12 次';
+  if(/箭步|分腿蹲|上台阶|单臂|单腿/.test(nm)) return sets+' 组 × 每侧 '+reps+' 次';
+  return sets+' 组 × '+reps+' 次';
+}
+
+/* ---------- 飲食 ---------- */
+const FM = {}; FOODS.forEach(function(f){ FM[f.n]=f });                            // 名稱 → 食物
+function g5(x){ return Math.max(5, Math.round(x/5)*5) }                            // 取 5 克的倍數，最少 5 克
 function qty(n,g){
   const f=FM[n];
   if(UW[n] && f.u){ const c=Math.max(0.5, Math.round(g/f.u*2)/2); return n.replace(/（.*）/,'')+' '+c+' '+UW[n]+'（约 '+Math.round(c*f.u)+' g）' }
@@ -485,43 +623,33 @@ function allowed(f,A){
   if((f.t==='m'||f.t==='s') && A.diet.indexOf('veg')>=0) return false;
   return true;
 }
-const MAINP = ['鸡胸肉（熟）','瘦牛肉（烤熟）','三文鱼（烤熟）','去皮鸡腿肉（烤熟）','鲈鱼（烤熟）','猪里脊（烤熟）','虾（煮熟）','老豆腐（较硬）','鳕鱼（烤熟）','豆腐（普通）'];
-const VEGP = ['老豆腐（较硬）','毛豆（煮熟）','豆腐（普通）','黑豆（煮熟）','鹰嘴豆（煮熟）'];
-const STAPLE = ['糙米饭（煮熟）','白米饭（煮熟）','红薯（烤熟）','土豆（煮熟）','玉米（煮熟）','荞麦面（煮熟）','意面（煮熟）'];
-const BSTAPLE = ['燕麦粥（水煮）','全麦面包','红薯（烤熟）','玉米（煮熟）'];
-const VEGS = ['西兰花（煮熟）','菠菜（煮熟）','小白菜（煮熟）','番茄','黄瓜','生菜（罗马生菜）','胡萝卜（煮熟）','香菇（煮熟）','青椒'];
-const BEXTRA = ['无糖豆浆（低脂）','希腊酸奶（脱脂、原味）','脱脂牛奶'];
-const FRUITS = [['香蕉',136],['苹果',182],['蓝莓',120],['橙子',150],['草莓',150],['苹果',182],['香蕉',136]];
-const SNACKS = [
-  [['希腊酸奶（脱脂、原味）',150],['蓝莓',80]],[['苹果',182],['杏仁',15]],[['香蕉',136],['杏仁',15]],
-  [['无糖豆浆（低脂）',250],['草莓',100]],[['橙子',150],['核桃',15]],[['原味低脂酸奶',150],['草莓',100]],[['苹果',182],['核桃',15]]
-];
 function pickFrom(list,i,A){
   const L=list.filter(function(n){ return allowed(FM[n],A) });
   return L[((i%L.length)+L.length)%L.length];
 }
 function menu(A,C){
-  const sh={b:.25,l:.35,d:.30,s:.10};
+  const sh=MEAL_SHARE, egg=FM[EGG];
   const proteinPool = A.diet.indexOf('veg')>=0 ? VEGP : MAINP;
   const days=[];
   for(let i=0;i<7;i++){
     const meals=[];
-    // 早餐
+    // 早餐：固定 1 份蛋（100 g），蛋白質不夠再加豆浆/酸奶/牛奶
     {
-      const pM=C.p*sh.b, items=[{n:'鸡蛋（煮熟）',g:100}];
-      const left=pM-12.6;
+      const pM=C.p*sh.b, items=[{n:EGG,g:100}];
+      const left=pM-egg.p;
       if(left>6){ const e=pickFrom(BEXTRA,i,A); items.push({n:e,g:Math.min(300,g5(left/FM[e].p*100))}) }
       const st=BSTAPLE[i%BSTAPLE.length];
       items.push({n:st,g:g5(C.c*sh.b/FM[st].cb*100*0.75),st:1});
       const fr=FRUITS[i%FRUITS.length]; items.push({n:fr[0],g:fr[1]});
       meals.push({name:'早餐',items:items,hint:'鸡蛋：水煮或蒸蛋；燕麦粥不加糖'});
     }
-    // 午餐、晚餐
+    // 午餐、晚餐：[名稱, 蛋白質池位移, 比例]
     [['午餐',0,sh.l],['晚餐',3,sh.d]].forEach(function(m,mi){
       const pM=C.p*m[2], pn=pickFrom(proteinPool,i+m[1],A), pf=FM[pn];
       const items=[]; let g=Math.min(260,g5(pM/pf.p*100)); items.push({n:pn,g:g});
       const got=pf.p*g/100;
-      if(got<pM*0.8 && allowed(FM['鸡蛋（煮熟）'],A)){ const c=Math.min(3,Math.max(1,Math.round((pM-got)/6.3))); items.push({n:'鸡蛋（煮熟）',g:c*50}) }
+      // 主菜蛋白質不到目標 8 成就補蛋（每個 50 g、約 6.3 g 蛋白質），1–3 個
+      if(got<pM*0.8 && allowed(egg,A)){ const c=Math.min(3,Math.max(1,Math.round((pM-got)/(egg.p/2)))); items.push({n:EGG,g:c*egg.u}) }
       const st=pickFrom(STAPLE,i+(mi?2:0),A);
       items.push({n:st,g:g5(C.c*m[2]/FM[st].cb*100*0.8),st:1});
       items.push({n:pickFrom(VEGS,i+(mi?2:0),A),g:100});
@@ -552,39 +680,64 @@ function menu(A,C){
   return days;
 }
 
-/* ================= 渲染 ================= */
+/* ---------- 上次存檔的檢查 ----------
+   localStorage 的內容不可信（GitHub Pages 同一個 username.github.io 底下的其他頁面共用 localStorage、
+   舊版格式、手動竄改都有可能），而 A 的部分欄位會直接拼進 innerHTML 或拿來查表。
+   原則：只擋「會被拼進 HTML 的非預期值」與「會讓原版程式出錯的值」，其他照原版寬鬆接受：
+   - goal/exp/place/days/mins 必須是本頁選項之一（days、mins 會原樣顯示在頁面上）
+   - age/height/weight 必須是正數；waist 可為 null 或數字（不顯示）
+   - injury/health/diet 必須是字串陣列；focus、eat、sw 可以缺少（舊版存檔可能沒有，原版也能顯示）
+   - 字串不得是 Object.prototype 上的名稱（例如 constructor），否則查表會取到函式
+   - sw（換過的動作）必須是動作資料裡的名稱，因為它會原樣顯示 */
+function has(o,k){ return Object.prototype.hasOwnProperty.call(o,k) }
+function isPos(x){ return typeof x==='number' && isFinite(x) && x>0 }
+function isStrArr(x){ return Array.isArray(x) && x.every(function(v){ return typeof v==='string' && !(v in Object.prototype) }) }
+function validSaved(A){
+  if(!A || typeof A!=='object' || Array.isArray(A)) return false;
+  if(!has(GOAL,A.goal) || !has(REPS,A.exp) || !has(LIB,A.place)) return false;
+  if(typeof A.days!=='number' || !has(SCHED,A.days) || typeof A.mins!=='number' || !has(SESSION_N,A.mins)) return false;
+  if(!isPos(A.age) || !isPos(A.height) || !isPos(A.weight)) return false;
+  if(A.waist!=null && !(typeof A.waist==='number' && isFinite(A.waist))) return false;
+  if(!isStrArr(A.injury) || !isStrArr(A.health) || !isStrArr(A.diet)) return false;
+  if(A.focus!==undefined && !isStrArr(A.focus)) return false;
+  if(A.eat!==undefined && typeof A.eat!=='string') return false;
+  if(A.sw!==undefined){
+    if(!A.sw || typeof A.sw!=='object' || Array.isArray(A.sw)) return false;
+    for(const k in A.sw){ if(!/^\d+-\d+$/.test(k) || typeof A.sw[k]!=='string' || !has(EXM,A.sw[k])) return false }
+  }
+  return true;
+}
+</script>
+<script>
+/* ==== src/js/render.js ==== */
+/* 卡片 HTML：只把資料組成 HTML 字串，不碰 DOM（Node 測試可直接比對輸出）。
+   安全前提：拼進 HTML 的只有本頁常數（動作、食物、文案）、計算出的數字，以及經 validSaved() 檢查過的存檔欄位；
+   沒有任何使用者自由輸入的文字。若日後加入自由輸入，必須先做 HTML 跳脫。 */
+
 const F = x=>x.toFixed(1);
 function summaryCard(A,C){
   let w='';
   if(C.flagged) w+='<div class="warn">你勾选了怀孕/哺乳、慢性病或年龄未满 18 岁。这种情况我只给「维持体重」的参考，不做热量缺口。开始训练或调整饮食前，请先问过医生。</div>';
   if(C.low && !C.flagged && (A.goal==='fat'||A.goal==='shape')) w+='<div class="warn">你的 BMI 偏低（'+F(C.bmi)+'），不建议再减重，所以热量按维持来算，重点放在力量训练和吃够蛋白质。</div>';
   const wk = Math.abs(C.weekly)<0.05 ? '体重基本持平' : (C.weekly<0?'每周约 -':'每周约 +')+F(Math.abs(C.weekly))+' kg（估算）';
-  return '<div class="card"><h3>你的专属方案</h3>'+
+  // 比例條：依熱量占比（蛋白質、碳水 4 kcal/g，脂肪 9 kcal/g）
+  const kp=C.p*4, kc=C.c*4, kf=C.f*9, tot=kp+kc+kf;
+  const pp=Math.round(kp/tot*100), cp=Math.round(kc/tot*100), fp=100-pp-cp;
+  return '<div class="card sum"><h3>你的专属方案</h3>'+
+  '<div class="muted">每日建议摄入</div>'+
+  '<div class="big"><b>'+C.kcal+'</b><span>kcal</span></div>'+
   '<div class="muted">目标：'+GOAL[A.goal]+' · 每周练 '+A.days+' 次 · 每次约 '+A.mins+' 分钟</div>'+w+
-  '<div class="kpis">'+
-  '<div class="kpi"><small>BMI</small><b>'+F(C.bmi)+'</b></div>'+
-  '<div class="kpi"><small>基础代谢（静息）</small><b>'+C.bmr+' kcal</b></div>'+
-  '<div class="kpi"><small>每日总消耗（估）</small><b>'+C.tdee+' kcal</b></div>'+
-  '<div class="kpi"><small>每日建议摄入</small><b>'+C.kcal+' kcal</b></div>'+
-  '<div class="kpi"><small>蛋白质</small><b>'+C.p+' g</b></div>'+
-  '<div class="kpi"><small>碳水</small><b>'+C.c+' g</b></div>'+
-  '<div class="kpi"><small>脂肪</small><b>'+C.f+' g</b></div>'+
-  '<div class="kpi"><small>预期体重变化</small><b style="font-size:14px">'+wk+'</b></div></div>'+
+  '<div class="mbar"><i class="m1" style="width:'+pp+'%"></i><i class="m2" style="width:'+cp+'%"></i><i class="m3" style="width:'+fp+'%"></i></div>'+
+  '<div class="mleg"><span><s class="m1"></s>蛋白质 <b>'+C.p+' g</b></span><span><s class="m2"></s>碳水 <b>'+C.c+' g</b></span><span><s class="m3"></s>脂肪 <b>'+C.f+' g</b></span></div>'+
+  '<div class="rows">'+
+  '<div><span>BMI</span><b>'+F(C.bmi)+'</b></div>'+
+  '<div><span>基础代谢（静息）</span><b>'+C.bmr+' kcal</b></div>'+
+  '<div><span>每日总消耗（估）</span><b>'+C.tdee+' kcal</b></div>'+
+  '<div><span>预期体重变化</span><b>'+wk+'</b></div></div>'+
   '<div class="muted">以上都是公式估算，不是医学诊断。按 2–3 周的实际体重变化再微调。</div></div>';
 }
-function alts(cur,dayEx,A){
-  const m=EXM[cur]; if(!m) return [];
-  const PL={gym:2,home:1,body:0}[A.place];
-  const names=[];
-  EXI.forEach(function(x){ if(x.g===m.g && x.lv<=PL && !(x.t && A.injury.indexOf(x.t)>=0) && names.indexOf(x.n)<0) names.push(x.n) });
-  const pos=names.indexOf(cur), out=[];
-  for(let k=1;k<=names.length;k++){ const c=names[(pos+k+names.length)%names.length];
-    if(c!==cur && dayEx.indexOf(c)<0 && !(m.id && EXM[c].id===m.id)) out.push(c) }
-  return out;
-}
-const IMGS = {"81": [{"f": "81-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "203": [{"f": "203-1.jpg", "au": "philip", "lic": "CC-BY-SA 4.0"}, {"f": "203-2.jpg", "au": "philip", "lic": "CC-BY-SA 4.0"}], "265": [{"f": "265-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "348": [{"f": "348-1.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "348-2.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "364": [{"f": "364-1.png", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "371": [{"f": "371-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "458": [{"f": "458-1.png", "au": "utkb", "lic": "CC-BY-SA 4.0"}, {"f": "458-2.png", "au": "utkb", "lic": "CC-BY-SA 4.0"}], "567": [{"f": "567-1.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "567-2.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "805": [{"f": "805-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "977": [{"f": "977-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "981": [{"f": "981-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "984": [{"f": "984-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "990": [{"f": "990-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1002": [{"f": "1002-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1084": [{"f": "1084-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1091": [{"f": "1091-1.jpg", "au": "clafal", "lic": "CC-BY-SA 4.0"}], "1117": [{"f": "1117-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}, {"f": "1117-2.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "1194": [{"f": "1194-1.png", "au": "", "lic": "CC-BY-SA 4.0"}, {"f": "1194-2.png", "au": "prevail90", "lic": "CC-BY-SA 4.0"}], "1230": [{"f": "1230-1.jpg", "au": "anonymous", "lic": "CC-BY-SA 4.0"}], "1239": [{"f": "1239-1.jpg", "au": "erikocobra", "lic": "CC-BY-SA 4.0"}], "1283": [{"f": "1283-1.jpg", "au": "carlos3c", "lic": "CC-BY-SA 4.0"}], "1336": [{"f": "1336-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1392": [{"f": "1392-1.png", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "1392-2.png", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "1551": [{"f": "1551-1.jpg", "au": "Settebello", "lic": "CC-BY-SA 4.0"}], "1572": [{"f": "1572-1.jpg", "au": "Settebello", "lic": "CC-BY-SA 4.0"}], "1613": [{"f": "1613-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1616": [{"f": "1616-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1639": [{"f": "1639-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1642": [{"f": "1642-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1651": [{"f": "1651-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1652": [{"f": "1652-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1706": [{"f": "1706-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1732": [{"f": "1732-1.jpg", "au": "54str", "lic": "CC-BY-SA 4.0"}], "1748": [{"f": "1748-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1963": [{"f": "1963-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "297": [{"f": "297-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1227": [{"f": "1227-1.gif", "au": "Lynn_McIntyre", "lic": "CC-BY-SA 4.0"}], "1863": [{"f": "1863-1.png", "au": "Davidgj32", "lic": "CC-BY-SA 4.0"}], "1867": [{"f": "1867-1.png", "au": "Davidgj32", "lic": "CC-BY-SA 4.0"}]};
-// 动作示范视频：名称 → 视频链接。填了就优先显示「看示范视频」；没填就显示 B 站搜索入口。
-const VIDEOS = {};
+
+/* ---------- 動作說明（示範圖、影片入口、wger 來源） ---------- */
 function mediaBlock(m){
   let h='';
   const L=IMGS[m.id]||[];
@@ -601,28 +754,36 @@ function srcLine(m){
   if(!m.id) return '';
   return '<div class="muted">来源：wger 动作 #'+m.id+(m.au?'，作者 '+m.au:'')+'，'+m.lic+'。中文要点为改写。</div>';
 }
+// 「怎么做」展開區塊（訓練計劃、重點加練、熱身拉伸共用）
+function howBlock(m){
+  return '<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details>';
+}
 function exItem(nm,i,j,A,dayEx){
   const m = EXM[nm];
   let h = '<li><div class="exr"><span>'+nm+' <i>'+exLine(nm,A)+'</i></span><span class="exb">'+
     (alts(nm,dayEx,A).length?'<button class="mini swp" data-k="'+i+'-'+j+'">换一个</button>':'')+'</span></div>';
-  if(m && m.how){
-    h += '<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details>';
-  }
+  if(m && m.how) h += howBlock(m);
   return h+'</li>';
 }
 function focusItem(nm,A){
   const m=EXM[nm]; if(!m) return '';
   let h='<li>'+nm+' <i>'+exLine(nm,A).replace(/^\d(–\d)? 组/,'2 组')+'</i>';
-  if(m.how) h+='<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details>';
+  if(m.how) h+=howBlock(m);
   return h+'</li>';
 }
 function stItem(nm){
   const m=EXM[nm]; if(!m) return '';
-  return '<li>'+nm+'<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details></li>';
+  return '<li>'+nm+howBlock(m)+'</li>';
 }
+
+/* ---------- 訓練計劃 ---------- */
 function workoutCard(A){
-  const W = workout(A); const [sets,reps,rest] = REPS[A.exp];
+  const W = workout(A); const rest = REPS[A.exp][2];
   let h = '<div class="card"><h3>每周训练安排</h3><div class="muted">每个动作之间休息 '+rest+'；每组留 2–3 次余力，不要练到力竭。点「怎么做」看要点，点「换一个」换成同类动作。</div>';
+  h += '<div class="week">'+['周一','周二','周三','周四','周五','周六','周日'].map(function(n){
+    const d=W.filter(function(x){ return x.day===n })[0];
+    return '<span class="wd'+(d?(d.cardio?' cd':' on'):'')+'" data-d="'+n+'"></span>';
+  }).join('')+'</div>';
   W.forEach((d,i)=>{
     h += '<div class="day"><h4><span>'+d.day+'</span>'+d.title+'</h4>';
     if(d.cardio){
@@ -645,12 +806,14 @@ function workoutCard(A){
     h += '<div class="warn">你选了重点部位，但在你的器材和不适部位限制下，目前没有合适的重点加练动作，所以这次没有加。可以换个重点部位，或在「动作库」里挑安全的动作。</div>';
   }
   if(A.injury.length && !A.injury.includes('none')){
-    const map={k:'膝盖',b:'腰背',s:'肩颈'}; const names=A.injury.filter(x=>map[x]).map(x=>map[x]).join('、');
+    const names=A.injury.filter(x=>INJ_NAME[x]).map(x=>INJ_NAME[x]).join('、');
     h += '<div class="warn">已避开对「'+names+'」压力大的动作，换动作时也会避开。这个分类是按动作类型整理的，不是医学判断。任何动作如果出现刺痛（不是肌肉酸），马上停下来，必要时去看医生。</div>';
   }
   h += '<div class="muted" style="margin-top:8px">动作资料来自开源项目 <b>wger</b>（wger.de），按 CC-BY-SA 授权，作者见各动作说明；中文要点由本页改写。</div>';
   return h+'</div>';
 }
+
+/* ---------- 飲食計劃 ---------- */
 function menuCard(A,C){
   const M = menu(A,C);
   let h = '<div class="card"><h3>7 天饮食示例</h3><div class="muted">每日目标约 '+C.kcal+' kcal，蛋白质 '+C.p+' g。克数按你的目标反推，是煮熟后的重量（水果、坚果除外），用厨房秤或对照手掌估一下就行，吃到七分饱。点每一天展开。</div>'+
@@ -668,34 +831,41 @@ function menuCard(A,C){
   h += '<div class="muted" style="margin-top:8px">营养数据来自美国农业部 FoodData Central，克数为估算。</div>';
   return h+'</div>';
 }
-const GL = {sq:'深蹲类',lg:'箭步与单腿',gl:'臀部与髋',hg:'大腿后侧',hp:'推（胸）',vp:'肩部',hr:'划船（背）',vr:'下拉（背）',rd:'上背与肩后束',tr:'三头肌',bi:'二头肌',core:'核心',calf:'小腿',st:'热身与拉伸'};
-const GORDER = ['sq','lg','gl','hg','hp','vp','tr','bi','hr','vr','rd','core','calf','st'];
+
+/* ---------- 動作庫 ---------- */
+const LIB_TITLE = {0:'徒手动作库',1:'家里器材动作库（哑铃、弹力带）',2:'健身房动作库',st:'热身与拉伸',w:'女性常练动作库'};
+function inScope(x,scope){
+  if(!x.how) return false;                       // 沒有 wger 資料的模板名稱不列
+  if(scope==='w') return WOMEN.indexOf(x.n)>=0;
+  if(scope==='st') return x.g==='st';
+  return x.g!=='st' && x.lv===scope;
+}
 function exLibCard(scope,A){
-  const title = {0:'徒手动作库',1:'家里器材动作库（哑铃、弹力带）',2:'健身房动作库',st:'热身与拉伸',w:'女性常练动作库'}[scope];
-  const list = EXI.filter(function(x){ return x.how && (scope==='w' ? WOMEN.indexOf(x.n)>=0 : scope==='st' ? x.g==='st' : (x.g!=='st' && x.lv===scope)) });
-  const warnMap={k:'膝盖',b:'腰背',s:'肩颈'};
-  let h = '<div class="card"><h3>'+title+'（'+list.length+' 个）</h3><div class="muted">点动作名展开做法。动作来自 wger，作者和授权见每条说明。'+(scope==='w'?'<br>这一类是按女性常见的训练重点（臀腿、髋、体态、手臂线条、核心、髋部灵活性）整理的，动作本身男女都能练，不是 wger 的分类。':'')+'</div>';
+  const list = EXI.filter(function(x){ return inScope(x,scope) });
+  let h = '<div class="card"><h3>'+LIB_TITLE[scope]+'（'+list.length+' 个）</h3><div class="muted">点动作名展开做法。动作来自 wger，作者和授权见每条说明。'+(scope==='w'?'<br>这一类是按女性常见的训练重点（臀腿、髋、体态、手臂线条、核心、髋部灵活性）整理的，动作本身男女都能练，不是 wger 的分类。':'')+'</div>';
   GORDER.forEach(function(g){
     const L=list.filter(function(x){ return x.g===g });
     if(!L.length) return;
     h += '<div class="day"><h4><span>'+GL[g]+'</span></h4>';
     L.forEach(function(m){
-      const w = (m.t && A.injury.indexOf(m.t)>=0) ? '<div class="warn" style="margin:4px 0">你选了「'+warnMap[m.t]+'」不适，这个动作对该部位压力较大，不建议做。</div>' : '';
+      const w = (m.t && A.injury.indexOf(m.t)>=0) ? '<div class="warn" style="margin:4px 0">你选了「'+INJ_NAME[m.t]+'」不适，这个动作对该部位压力较大，不建议做。</div>' : '';
       h += '<details class="xd"><summary style="font-size:15px;color:var(--ink)">'+m.n+' <span class="muted">'+m.mus+'</span></summary><div class="xb"><div class="muted">器材：'+m.eq+'</div>'+m.how+w+mediaBlock(m)+srcLine(m)+'</div></details>';
     });
     h += '</div>';
   });
   return h+'</div>';
 }
+
+/* ---------- 食物庫 ---------- */
+const FOOD_TAG = {m:'肉',s:'海鲜',e:'蛋',d:'含乳糖'};
 function foodLibCard(A){
   const cats=[]; FOODS.forEach(function(f){ if(cats.indexOf(f.c)<0) cats.push(f.c) });
-  const tag={m:'肉',s:'海鲜',e:'蛋',d:'含乳糖'};
   let h='<div class="card"><h3>食物库（'+FOODS.length+' 种）</h3><div class="muted">每 100 克的营养。带「含乳糖」「海鲜」「肉」标记的，和你的忌口有冲突时会提醒。数据来自美国农业部 FoodData Central。</div>';
   cats.forEach(function(c,ci){
     h += '<details class="dd"'+(ci===0?' open':'')+'><summary>'+c+'</summary>';
     FOODS.filter(function(f){ return f.c===c }).forEach(function(f){
       const bad = !allowed(f,A);
-      h += '<div class="meal"'+(bad?' style="opacity:.5"':'')+'><b>'+f.n+'</b> '+(f.t?'<small style="color:var(--warn)">'+tag[f.t]+(bad?'（你的忌口，不推荐）':'')+'</small>':'')+
+      h += '<div class="meal"'+(bad?' style="opacity:.5"':'')+'><b>'+f.n+'</b> '+(f.t?'<small style="color:var(--warn)">'+FOOD_TAG[f.t]+(bad?'（你的忌口，不推荐）':'')+'</small>':'')+
         '<br><small>热量 '+f.k+' kcal · 蛋白质 '+f.p.toFixed(1)+' g · 碳水 '+f.cb.toFixed(1)+' g · 脂肪 '+f.f.toFixed(1)+' g</small>'+
         (f.us?'<br><small>份量：'+f.us+'</small>':'')+(f.ck?'<br><small>吃法：'+f.ck+'</small>':'')+'</div>';
     });
@@ -703,6 +873,8 @@ function foodLibCard(A){
   });
   return h+'<div class="muted" style="margin-top:8px">带「熟」的是煮熟、烤熟后的重量，不带的是生吃的重量。</div></div>';
 }
+
+/* ---------- 小貼士、複製摘要 ---------- */
 function tipsCard(A,C){
   return '<div class="card"><h3>小贴士</h3><ul class="t">'+
   '<li><b>喝水：</b>每天 1.5–2 升，训练日再多一点。</li>'+
@@ -717,6 +889,144 @@ function planText(A,C){
   workout(A).forEach(d=>{ t+=d.day+' '+d.title+'：'+(d.cardio?'有氧 30–40 分钟 + 拉伸':d.ex.join('、'))+'\n' });
   return t+'\n（公式估算，非医学建议）';
 }
+</script>
+<script>
+/* ==== src/js/app.js ==== */
+/* 聊天介面與問答流程（唯一碰 DOM 的檔案）。最後一個載入。
+   頁面開頭的內嵌小段程式（dev.html / index.html）已先註冊錯誤提示條（#err）與 FIT_LOAD_FAILED；
+   開發版 dev.html 若前面任一檔案載入失敗就不啟動（正式版 index.html 是單檔，不會有這種情況）。 */
+
+const $ = s => document.querySelector(s);
+const chat = $('#chat'), tray = $('#tray');
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const STORE_KEY = 'fit_A';
+const PROG_TOTAL = 14;   // 問卷題數（目標、年齡、身高、體重、腰圍、基礎、天數、時間、場地、重點、不適、健康、忌口、飲食）
+let answered = 0;
+function setProg(n){
+  answered = n;
+  const i = document.querySelector('#prog i');
+  if(i) i.style.width = Math.min(100, Math.round(n/PROG_TOTAL*100)) + '%';
+}
+let A = {};
+let runId = 0;
+
+/* ---------- localStorage：一律包 try/catch（部分環境會丟 SecurityError） ---------- */
+function loadSaved(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)||'null') }catch(e){ return null } }
+function saveA(){ try{ localStorage.setItem(STORE_KEY,JSON.stringify(A)) }catch(e){} }
+function clearSaved(){ try{ localStorage.removeItem(STORE_KEY) }catch(e){} }
+
+/* ---------- 聊天泡泡 ---------- */
+function el(tag, cls, html){const e=document.createElement(tag); if(cls)e.className=cls; if(html!=null)e.innerHTML=html; return e}
+function toBottom(){ setTimeout(()=>{ const h=Math.max(document.documentElement.scrollHeight,document.body.scrollHeight); window.scrollTo(0,h); },30) }
+function add(who, html, wide){
+  // wide：整張卡片佔滿寬度，同一列加 has-wide 以隱藏頭像（取代原本的 :has()，老版微信不支援）
+  const row = el('div','row '+who+(wide?' has-wide':''));
+  row.appendChild(el('div','bub'+(wide?' wide':''), html));
+  chat.insertBefore(row, tray); toBottom(); return row;
+}
+async function say(html, wide){
+  const t = add('bot','<span class="typing"><span></span><span></span><span></span></span>');
+  await sleep(wide?500:350+Math.min(html.length*9,800));
+  t.remove(); add('bot',html,wide);
+}
+function clearTray(){tray.innerHTML=''}
+
+/* ---------- 回答元件（都放在聊天流最後的 #tray，隨頁面自然捲動） ----------
+   選項文字、說明都是本頁常數，不接受使用者輸入（innerHTML 安全）。
+   opts[i]：{label, value, sub?（一行說明）, rec?（顯示「建議」）, cls?}；o.back 為 true 時多一個「改上一題」。 */
+const BACK = {};   // 使用者按「改上一題」時回傳的標記
+function backBtn(box,res){
+  const b = el('button','chip ghost back','← 改上一题');
+  b.onclick = ()=>{ clearTray(); res(BACK) };
+  box.appendChild(b);
+}
+const recTag = x => x.rec ? '<span class="rec">建议</span>' : '';
+// 单选
+function pick(q, opts, o){
+  o = o||{};
+  return new Promise(async res=>{
+    if(q) await say(q);
+    clearTray();
+    const rows = opts.some(x=>x.sub);
+    const box = el('div', rows?'opts':'chips');
+    opts.forEach(x=>{
+      const b = el('button','chip'+(rows?' opt':'')+(x.cls?' '+x.cls:''),
+        rows ? '<b>'+x.label+recTag(x)+'</b><small>'+x.sub+'</small>' : x.label+recTag(x));
+      b.onclick = ()=>{ add('user',x.label); clearTray(); res(x.value) };
+      box.appendChild(b);
+    });
+    if(o.back) backBtn(box,res);
+    tray.appendChild(box); toBottom();
+  });
+}
+// 多选；exclusive 表示与其他互斥的选项（如“没有”）
+function multi(q, opts, exclusive, o){
+  o = o||{};
+  return new Promise(async res=>{
+    await say(q); clearTray();
+    const box = el('div','chips'); const sel = new Set();
+    const btns = opts.map(x=>{
+      const b = el('button','chip',x.label);
+      b.onclick = ()=>{
+        if(sel.has(x.value)){sel.delete(x.value)}
+        else{
+          if(x.value===exclusive){sel.clear()} else {sel.delete(exclusive)}
+          sel.add(x.value);
+        }
+        btns.forEach((y,i)=>y.classList.toggle('on', sel.has(opts[i].value)));
+      };
+      box.appendChild(b); return b;
+    });
+    const ok = el('button','chip go','确定');
+    ok.onclick = ()=>{
+      if(!sel.size){ sel.add(exclusive) }
+      const labels = opts.filter(x=>sel.has(x.value)).map(x=>x.label).join('、');
+      add('user',labels); clearTray(); res([...sel]);
+    };
+    box.appendChild(ok);
+    if(o.back) backBtn(box,res);
+    tray.appendChild(box); toBottom();
+  });
+}
+// 数字选择：点 − / + 调整，不用输入框也不弹键盘（微信里 <input> 不显示）
+// 起始数字只是示例：没动过就按下去，按钮会写明「就是 30 岁」，避免不小心拿示例数字去算计划
+function num(q, o){
+  return new Promise(async res=>{
+    await say(q); clearTray();
+    let v = o.def, touched = false;
+    const dec = (String(o.s1).indexOf('.')>=0);
+    const fmt = x => dec ? (Math.round(x*10)/10).toFixed(1) : String(Math.round(x));
+    const wrap = el('div');
+    const row = el('div','stepper');
+    const disp = el('div','sdisp');
+    const val = el('b','',fmt(v)); const unit = el('span','',' '+o.unit);
+    disp.appendChild(val); disp.appendChild(unit);
+    const ok = el('button','chip go','确定');
+    const sync = ()=>{
+      val.textContent = fmt(v); disp.style.setProperty('--off', (-v*8)+'px');
+      if(touched){ ok.textContent='确定'; ok.className='chip go' }
+      else { ok.textContent='就是 '+fmt(v)+' '+o.unit; ok.className='chip ok0' }
+    };
+    const mk = (label,d)=>{
+      const b = el('button','chip sbtn',label);
+      b.onclick = ()=>{ v = Math.min(o.max, Math.max(o.min, Math.round((v+d)*10)/10)); touched = true; sync() };
+      return b;
+    };
+    sync();
+    row.appendChild(mk('−'+o.s2,-o.s2)); row.appendChild(mk('−'+o.s1,-o.s1));
+    row.appendChild(disp);
+    row.appendChild(mk('+'+o.s1,o.s1)); row.appendChild(mk('+'+o.s2,o.s2));
+    wrap.appendChild(row);
+    const act = el('div','sact');
+    ok.onclick = ()=>{ add('user', fmt(v)+' '+o.unit); clearTray(); res(v) };
+    act.appendChild(ok);
+    if(o.skip){ const sk=el('button','chip ghost','跳过'); sk.onclick=()=>{add('user','跳过');clearTray();res(null)}; act.appendChild(sk); }
+    if(o.back) backBtn(act,res);
+    wrap.appendChild(act);
+    tray.appendChild(wrap); toBottom();
+  });
+}
+
 function copyText(t){
   try{ if(navigator.clipboard && window.isSecureContext){ return navigator.clipboard.writeText(t) } }catch(e){}
   const ta=el('textarea'); ta.value=t; ta.style.position='fixed'; ta.style.opacity=0; document.body.appendChild(ta); ta.select();
@@ -725,6 +1035,7 @@ function copyText(t){
 
 /* ================= 对话流程 ================= */
 async function showResult(my){
+  setProg(PROG_TOTAL);
   const C = calc(A);
   await say(summaryCard(A,C),true);
   while(true){
@@ -742,49 +1053,101 @@ async function showResult(my){
     }
     else if(c==='t') await say(tipsCard(A,C),true);
     else if(c==='c'){ await copyText(planText(A,C)); await say('已复制，可以直接粘贴发给朋友或存到备忘录。'); }
-    else if(c==='r'){ try{localStorage.removeItem('fit_A')}catch(e){} start(); return }
+    else if(c==='r'){ clearSaved(); start(); return }
   }
 }
+/* 問卷步驟：每一步 {k 存進 A 的欄位, ask(A,back) 問題, react(v,A) 答完後的一句回應（可省略）}。
+   「改上一題」：把這一題與上一題在聊天裡留下的泡泡一起移除，重新問上一題。 */
+const INTRO_HINT = '一共 14 个小问题，选错了可以点「改上一题」。所有数据只在你的手机上计算，不会上传。';
+const REACT_GOAL = {
+  fat:'好，目标减脂。我会按温和的节奏算，不会让你吃得太少。',
+  muscle:'好，目标增肌塑形。我会把蛋白质和训练量排得足一些。',
+  shape:'好，想改善体态、紧致线条。力量训练会是重点。',
+  keep:'好，保持健康。我们按稳定、能长期坚持来排。'
+};
+const STEPS = [
+  {k:'goal', ask:(A,bk)=>pick('先说说你最想达成什么？',[
+     {label:'减脂',sub:'把体脂降下来，同时尽量保住肌肉',value:'fat'},
+     {label:'增肌塑形',sub:'练出线条，让身体更有力量',value:'muscle'},
+     {label:'改善体态、紧致',sub:'肩背更挺，整个人更紧致',value:'shape'},
+     {label:'保持健康',sub:'不追求变化，把现在的状态稳住',value:'keep'}],{back:bk}),
+   react:v=>REACT_GOAL[v]},
+  {k:'age', ask:(A,bk)=>num('你今年多大了？点 − ＋ 调到你的年龄',{min:14,max:75,unit:'岁',def:30,s1:1,s2:5,back:bk})},
+  {k:'height', ask:(A,bk)=>num('身高多少？点 − ＋ 调整',{min:130,max:200,unit:'cm',def:160,s1:1,s2:5,back:bk})},
+  {k:'weight', ask:(A,bk)=>num('现在体重多少？点 − ＋ 调到你的数字（早上空腹最准）',{min:30,max:150,unit:'kg',def:55,s1:0.5,s2:5,back:bk})},
+  {k:'waist', ask:(A,bk)=>num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',def:70,s1:1,s2:5,skip:true,back:bk})},
+  {k:'exp', ask:(A,bk)=>pick('你现在的运动基础是？',[
+     {label:'零基础',sub:'几乎没系统运动过',value:'new'},
+     {label:'偶尔运动',sub:'有空才动一动，没有固定节奏',value:'some'},
+     {label:'规律训练过',sub:'已经有固定的训练习惯',value:'reg'}],{back:bk}),
+   react:v=>v==='new' ? '没关系，从零开始最稳，动作和组数我会先排得轻松一点。' : v==='reg' ? '好，那训练量我会排得足一点。' : null},
+  {k:'days', ask:(A,bk)=>pick('每周打算练几天？先选你能坚持的，不是最理想的。',[
+     {label:'2 天',value:2},{label:'3 天',value:3,rec:A.exp!=='reg'},{label:'4 天',value:4,rec:A.exp==='reg'},{label:'5 天',value:5}],{back:bk})},
+  {k:'mins', ask:(A,bk)=>pick('每次大概能练多久？',[
+     {label:'30 分钟',value:30,rec:A.exp==='new'},{label:'45 分钟',value:45,rec:A.exp!=='new'},{label:'60 分钟',value:60}],{back:bk})},
+  {k:'place', ask:(A,bk)=>pick('主要在哪里练？',[
+     {label:'健身房',sub:'有器械可以用',value:'gym'},
+     {label:'家里有哑铃/弹力带',sub:'在家练，有一点器材',value:'home'},
+     {label:'家里徒手',sub:'什么器材都没有',value:'body'}],{back:bk})},
+  {k:'focus', ask:(A,bk)=>multi('有没有特别想重点改善的部位？（可多选，选完点确定；不选就按整体来）',[
+     {label:'臀腿线条',value:'hips'},{label:'腰腹',value:'abs'},{label:'手臂',value:'arms'},{label:'背部体态',value:'posture'},{label:'没有特别想要的',value:'none'}],'none',{back:bk}),
+   react:v=>v.indexOf('none')<0 ? '好，每个训练日我会加一小段「重点加练」。' : null},
+  {k:'injury', ask:(A,bk)=>multi('有没有哪些部位不舒服或受过伤？（可多选）',[
+     {label:'膝盖',value:'k'},{label:'腰背',value:'b'},{label:'肩颈',value:'s'},{label:'都没有',value:'none'}],'none',{back:bk}),
+   react:v=>v.indexOf('none')<0 ? '收到，这些部位我会避开压力大的动作。' : null},
+  {k:'health', ask:(A,bk)=>multi('下面这些情况有没有？这类情况我会更保守，所以先问一下。没有就选「都没有」。',[
+     {label:'怀孕或哺乳期',value:'preg'},{label:'有慢性病或在服药',value:'chronic'},{label:'都没有',value:'none'}],'none',{back:bk}),
+   react:v=>v.indexOf('none')<0 ? '好，我会更保守：只给维持体重的参考，不做热量缺口。开始训练前也请先问过医生。' : null},
+  {k:'diet', ask:(A,bk)=>multi('饮食上有什么忌口？（可多选）',[
+     {label:'吃蛋奶素',value:'veg'},{label:'乳糖不耐',value:'lactose'},{label:'海鲜过敏',value:'seafood'},{label:'没有忌口',value:'none'}],'none',{back:bk}),
+   react:v=>v.indexOf('none')<0 ? '收到，菜单会避开这些。' : null},
+  {k:'eat', ask:(A,bk)=>pick('平时吃饭主要是？',[
+     {label:'外食为主',sub:'食堂、外卖、餐厅',value:'out'},
+     {label:'自己做饭',sub:'食材自己买，自己做',value:'cook'},
+     {label:'两种都有',sub:'有时自己做，有时在外面吃',value:'mix'}],{back:bk})}
+];
+const rowCount = () => chat.querySelectorAll('.row').length;
+const dropRowsFrom = n => [].slice.call(chat.querySelectorAll('.row')).slice(n).forEach(r=>r.remove());
+
 async function flow(my){
-  chat.querySelectorAll('.row').forEach(r=>r.remove()); clearTray(); A={};
-  let saved=null; try{saved=JSON.parse(localStorage.getItem('fit_A')||'null')}catch(e){}
+  chat.querySelectorAll('.row').forEach(r=>r.remove()); clearTray(); A={}; setProg(0);
+  let saved=loadSaved();
+  if(saved && !validSaved(saved)) saved=null;   // 存檔格式不對就當作沒有，重新問
   await say('你好呀，我是健身小助手。回答几个小问题，我就能按你的身体情况，排出训练和饮食计划。');
   if(saved){
     const r = await pick('看到你上次已经做过一份计划，要继续用吗？',[{label:'继续上次的',value:'y'},{label:'重新来一份',value:'n'}]);
     if(r==='y'){ A=saved; return showResult(my) }
   }
-  await say('所有数据只在你的手机上计算，不会上传。');
-  A.goal = await pick('先说说你最想达成什么？',[{label:'减脂',value:'fat'},{label:'增肌塑形',value:'muscle'},{label:'改善体态、紧致',value:'shape'},{label:'保持健康',value:'keep'}]);
-  A.age = await num('你今年多大了？点 − ＋ 调到你的年龄',{min:14,max:75,unit:'岁',def:30,s1:1,s2:5});
-  A.height = await num('身高多少？点 − ＋ 调整',{min:130,max:200,unit:'cm',def:160,s1:1,s2:5});
-  A.weight = await num('现在体重多少？点 − ＋ 调到你的数字（早上空腹最准）',{min:30,max:150,unit:'kg',def:55,s1:0.5,s2:5});
-  A.waist = await num('腰围方便量的话告诉我，用来以后对比变化，不量就跳过。',{min:50,max:140,unit:'cm',def:70,s1:1,s2:5,skip:true});
-  A.exp = await pick('你现在的运动基础是？',[{label:'零基础',value:'new'},{label:'偶尔运动',value:'some'},{label:'规律训练过',value:'reg'}]);
-  A.days = await pick('每周打算练几天？',[{label:'2 天',value:2},{label:'3 天',value:3},{label:'4 天',value:4},{label:'5 天',value:5}]);
-  A.mins = await pick('每次大概能练多久？',[{label:'30 分钟',value:30},{label:'45 分钟',value:45},{label:'60 分钟',value:60}]);
-  A.place = await pick('主要在哪里练？',[{label:'健身房',value:'gym'},{label:'家里有哑铃/弹力带',value:'home'},{label:'家里徒手',value:'body'}]);
-  A.focus = await multi('有没有特别想重点改善的部位？（可多选，不选就按整体来）',[{label:'臀腿线条',value:'hips'},{label:'腰腹',value:'abs'},{label:'手臂',value:'arms'},{label:'背部体态',value:'posture'},{label:'没有特别想要的',value:'none'}],'none');
-  const inj = await multi('有没有哪些部位不舒服或受过伤？（可多选）',[{label:'膝盖',value:'k'},{label:'腰背',value:'b'},{label:'肩颈',value:'s'},{label:'都没有',value:'none'}],'none');
-  A.injury = inj;
-  A.health = await multi('下面这些情况有没有？没有就选「都没有」。',[{label:'怀孕或哺乳期',value:'preg'},{label:'有慢性病或在服药',value:'chronic'},{label:'都没有',value:'none'}],'none');
-  A.diet = await multi('饮食上有什么忌口？（可多选）',[{label:'吃蛋奶素',value:'veg'},{label:'乳糖不耐',value:'lactose'},{label:'海鲜过敏',value:'seafood'},{label:'没有忌口',value:'none'}],'none');
-  A.eat = await pick('平时吃饭主要是？',[{label:'外食为主',value:'out'},{label:'自己做饭',value:'cook'},{label:'两种都有',value:'mix'}]);
-  try{localStorage.setItem('fit_A',JSON.stringify(A))}catch(e){}
-  await say('好的，我按你的情况算一下……');
+  await say(INTRO_HINT);
+  const marks=[];
+  let i=0;
+  while(i<STEPS.length){
+    if(my!==runId) return;
+    const st=STEPS[i]; marks[i]=rowCount(); setProg(i);
+    const v = await st.ask(A, i>0);
+    if(my!==runId) return;
+    if(v===BACK){ dropRowsFrom(marks[i]); i--; dropRowsFrom(marks[i]); continue }
+    A[st.k]=v;
+    const t = st.react ? st.react(v,A) : null;
+    if(t) await say(t);
+    i++;
+  }
+  saveA();
+  await say('好的：目标'+GOAL[A.goal]+'，'+A.age+' 岁、'+A.height+' cm、'+A.weight+' kg，每周练 '+A.days+' 次，每次约 '+A.mins+' 分钟。我来算一下……');
   await showResult(my);
 }
 function start(){ runId++; flow(runId) }
+
+// 「换一个」：事件委派；换完重画所在的那张训练卡
 chat.addEventListener('click',function(ev){
   const b = ev.target.closest ? ev.target.closest('.swp') : null; if(!b) return;
-  const key=b.getAttribute('data-k').split('-'); const i=+key[0], j=+key[1];
-  const day=workout(A)[i]; const cur=day.ex[j];
-  const list=alts(cur,day.ex,A); if(!list.length) return;
-  A.sw=A.sw||{}; A.sw[i+'-'+j]=list[0];
-  try{localStorage.setItem('fit_A',JSON.stringify(A))}catch(e){}
+  const key=b.getAttribute('data-k').split('-');
+  if(!applySwap(A,+key[0],+key[1])) return;
+  saveA();
   b.closest('.bub').innerHTML=workoutCard(A);
 });
-window.addEventListener('error',e=>{ const b=document.getElementById('err'); b.style.display='block'; b.textContent='页面出错：'+(e.message||'未知')+' ('+(e.lineno||'?')+')'; });
-start();
+
+if(!FIT_LOAD_FAILED.length) start();
 </script>
 </body>
 </html>
