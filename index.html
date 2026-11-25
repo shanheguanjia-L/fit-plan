@@ -87,6 +87,8 @@ header small{display:block;color:var(--mut);font-size:12px;line-height:16px}
 .opt b{display:block;line-height:22px}
 .opt small{display:block;margin-top:2px;color:var(--mut);font-size:13px;line-height:20px}
 .opts .back{margin-top:8px;width:auto}
+.ogrp{margin:16px 0 8px;font-size:12px;line-height:16px;color:var(--mut)}
+.ogrp:first-child{margin-top:0}
 .rec{display:inline-block;margin-left:8px;padding:0 4px;border:1px solid var(--line);border-radius:4px;color:var(--mut);font-size:11px;line-height:16px;font-weight:400;vertical-align:1px}
 .chip.ok0{flex:1;background:var(--card);border-color:var(--ink);color:var(--ink)}
 .sact .back{order:-1}
@@ -237,8 +239,8 @@ const EXERCISE_ROWS = [
  ['跪姿俯卧撑','hp',0,'s','胸肌、肩','徒手','双膝并拢跪地，双手在身前略比肩宽、位于肩的正下方，身体从头到膝成一条直线。屈肘降低躯干，躯干保持稳定，膝盖不离地，再用手推地回到起点。',1218,'PaukOne','CC-BY-SA 4.0'],
  ['上斜俯卧撑（手扶椅子）','hp',0,'s','胸肌、三头肌','椅子或长凳','上半身抬高，主要练胸肌，同时练到三头肌、肩和核心。与标准俯卧撑相比，三头肌参与较少。',1111,'anon1337','CC-BY-SA 4.0'],
  ['哑铃地板卧推','hp',1,'s','胸肌','哑铃','双手持哑铃仰卧，屈膝、双脚踩地（有长凳可以用）。把哑铃推起到肘部伸直，再慢慢放下，直到上臂靠近身体并贴到地面，停一下再推起。顶端夹紧胸肌。',1084,'','CC-BY-SA 4.0'],
- ['哑铃卧推','hp',2,'s','胸肌','哑铃、长凳'],
- ['胸部推举机','hp',2,'s','胸肌','器械'],
+ ['哑铃卧推','hp',2,'s','胸肌','哑铃、长凳','坐在平凳的一端，把哑铃竖直靠在大腿上。身体向后躺的同时，用膝盖把哑铃顶向胸口。双脚踩稳地面，肩胛骨向后夹紧、贴住长凳，下背保持自然的弧度，再把哑铃向上推向天花板。',75,'wger.de','CC-BY-SA 3.0'],
+ ['胸部推举机','hp',2,'s','胸肌','器械','调整座椅高度，让把手与胸口平行。用腿蹬脚踏板，把把手带到起始位置。背部贴紧靠垫，向外推，推出时呼气。让把手轻轻回到胸口，回来时吸气。',129,'wger.de','CC-BY-SA 3.0'],
 // 垂直推、侧平举 vp
  ['哑铃肩推','vp',1,'s','肩部','哑铃','坐在长凳上，靠背接近垂直。双手持哑铃举到肩高，手掌和肘全程朝前。向上推起，最高点哑铃靠近但不碰到，再慢慢放下重复。',567,'wger.de','CC-BY-SA 3.0','哑铃推肩'],
  ['哑铃侧平举','vp',1,'s','肩部（三角肌）','哑铃','练三角肌。手臂伸直或微屈，把哑铃向两侧抬到约与肩同高。身体略向前倾，髋和膝微屈。',348,'wger.de','CC-BY-SA 3.0'],
@@ -261,7 +263,7 @@ const EXERCISE_ROWS = [
  ['哑铃俯身臂屈伸','tr',1,'s','三头肌','哑铃','双手各持一只哑铃，掌心相对躯干。背挺直、膝微屈，髋部前屈，躯干接近与地面平行，抬头。上臂紧贴躯干并与地面平行，前臂垂向地面、肘约成 90°，再向后伸直前臂。',655,'bodybuilding.com','CC-BY-SA 3.0'],
  ['哑铃臂屈伸','tr',1,'s','三头肌','哑铃','要点：肘部固定，肌肉主动发力，不借惯性，动作受控且缓慢，不要过度伸直。',1336,'Anastasious','CC-BY-SA 4.0'],
  ['绳索三头下压','tr',2,'','三头肌','绳索器械','常见的三头肌动作，容易学。通常做 8–12 次或更多，放在上肢或手臂训练日里。',805,'cshep442','CC-BY-SA 4.0'],
- ['哑铃弯举','bi',1,'','二头肌','哑铃'],
+ ['哑铃弯举','bi',1,'','二头肌','哑铃','双手各持一只哑铃，手臂伸直、放在身体两侧，掌心朝内。屈臂把重量向上举，在动作一开始就把手臂旋转 90°，到最高点再稍微向外转一点。不停顿地慢慢放下。不要让身体晃动，全部由二头肌发力。',92,'wger.de','CC-BY-SA 3.0'],
 // 核心 core
  ['平板支撑','core',0,'','核心','徒手','前臂和脚尖撑地，手臂弯曲、肘在肩的正下方。身体全程保持一条直线，尽量久地保持。想加大难度，可以抬起一只手臂或一条腿。',458,'YYCfit / BFad07','CC-BY-SA 3.0'],
  ['侧平板支撑','core',0,'','腹斜肌','徒手','练腹斜肌，帮助稳定脊柱。侧躺，用前臂和膝到脚的一侧撑起身体。',580,'bodybuilding.com','CC-BY-SA 4.0'],
@@ -321,7 +323,24 @@ const EXERCISE_ROWS = [
  ['髋部交叉拉伸','st',0,'','髋、臀、下背','垫子','仰卧，手臂向两侧伸展，双腿并拢屈膝。把双膝慢慢倒向一侧，同时让肩膀和手臂保持贴地，你会在髋、臀和下背感到拉伸。稍停，把膝盖带回中间，再换另一侧。',1863,'Davidgj32','CC-BY-SA 4.0'],
  ['蝴蝶式拉伸','st',0,'','大腿内侧、髋','徒手','坐成祈祷姿势，双脚脚底轻轻相贴。用手慢慢把双脚拉向腹股沟，按需要保持。',1843,'Croak6728','CC-BY-SA 4.0'],
  ['青蛙式拉伸','st',0,'','臀、髋','垫子','四点跪姿，把膝盖向外打开，降低到用前臂撑地。肘和膝不动，开始前后摇动，让臀部尽量靠近脚。',1844,'Croak6728','CC-BY-SA 4.0'],
- ['台阶小腿拉伸','st',0,'','小腿','台阶、墙或栏杆','站在台阶或稳固的高处，前脚掌踩在边缘，脚跟悬空，扶着栏杆或墙保持平衡。让一只或双脚的脚跟降到低于台阶，感到小腿被拉伸并保持。膝盖伸直时，拉伸的是小腿的腓肠肌。',2666,'trs1800','CC-BY-SA 4.0']
+ ['台阶小腿拉伸','st',0,'','小腿','台阶、墙或栏杆','站在台阶或稳固的高处，前脚掌踩在边缘，脚跟悬空，扶着栏杆或墙保持平衡。让一只或双脚的脚跟降到低于台阶，感到小腿被拉伸并保持。膝盖伸直时，拉伸的是小腿的腓肠肌。',2666,'trs1800','CC-BY-SA 4.0'],
+ // ---- 部位細分：胸、肩、背、二頭、小腿、大腿內側（wger）----
+ ['哑铃上斜卧推','hp',2,'s','胸（上胸）、肩','上斜凳、哑铃','卧推的变化，重点刺激胸大肌的锁骨部（上胸）。把长凳调到 30–45° 之间，让躯干倾斜，推的角度改变，更多张力转到上胸和肩，有助于让上半身发展得更均衡、更立体。',537,'wger.de','CC-BY-SA 3.0'],
+ ['蝴蝶机夹胸','hp',2,'s','胸肌','蝴蝶机','坐在蝴蝶机上，双脚踩实地面，上臂与地面平行。把双臂向中间夹，直到把手几乎碰在一起（但不要碰到）。再慢慢回来，重量全程保持悬空。',135,'wger.de','CC-BY-SA 3.0'],
+ ['绳索上斜单臂推胸','hp',2,'s','胸肌','绳索器械','用绳索单臂推胸，另一只手撑住身体，把注意力放在推的力量上，而不是平衡。起始时手尽量靠近胸口，然后朝着略向上斜的方向，对准胸口中央推出。',1660,'Shiladree','CC-BY-SA 4.0'],
+ ['绳索下斜单臂推胸','hp',2,'s','胸肌','绳索器械','用绳索单臂推胸，另一只手撑住身体，把注意力放在推的力量上，而不是平衡。起始时手尽量靠近胸口，然后朝着略向下斜的方向，对准胸口中央推出。',1656,'Shiladree','CC-BY-SA 4.0'],
+ ['下斜俯卧撑（双脚垫高）','hp',0,'s','胸肌','长凳、椅子或台阶','下斜俯卧撑是传统俯卧撑的变化，用不同的方式刺激上半身肌肉。把双脚垫高在长凳、椅子或台阶上，双手撑地成俯卧撑姿势。身体保持从肩到脚踝一条直线，向地面下放，再推起。',1112,'anon1337','CC-BY-SA 4.0'],
+ ['阿诺德推举','vp',1,'s','肩部','哑铃、有靠背的长凳','坐在有靠背的长凳上，双手各持哑铃放在肩前，掌心朝向自己、肘在身体前方。把哑铃向头顶推起，同时旋转手腕，让掌心在顶端朝前，在手肘锁死前停住。再受控地放下，同时把掌心转回朝向自己，回到起始位置。',20,'trzr23','CC-BY-SA 3.0'],
+ ['单臂哑铃肩推','vp',1,'s','肩部','哑铃','把哑铃垂直向头顶推起，直到手臂完全伸直，但不要锁死手肘。再慢慢把哑铃放回肩的高度。',1968,'evtimovgeorg','CC-BY-SA 4.0'],
+ ['弹力带前平举','vp',1,'s','肩前侧','弹力带','双脚站在弹力带中间，与髋同宽，双手各握一端放在大腿前。手臂保持伸直、肘微屈，把手向前举到与肩同高，再慢慢放下。可以双手一起做或交替做。换更强的弹力带或缩短弹力带，可以加大阻力。',2622,'trs1800','CC-BY-SA 4.0'],
+ ['直臂下压','vr',2,'','背阔肌','绳索器械','手臂保持伸直但不锁死，用背阔肌发力，不要用肩膀。动作中不要让肩膀向上耸。',1726,'barry','CC-BY-SA 4.0'],
+ ['器械坐姿划船','hr',2,'','背阔肌','划船器械','挺胸，拉到最后夹紧肩胛骨。不要驼背或弓背。',1725,'barry','CC-BY-SA 4.0'],
+ ['锤式弯举','bi',1,'','二头肌','哑铃','开始：双手各持哑铃放在身体两侧，掌心朝向躯干。弯举：保持中立握法（像握锤子一样），把重量向肩膀举起。顶端收缩二头肌，肘不要向前移。放下：控制着慢慢回到起始位置。',272,'wger.de','CC-BY-SA 3.0'],
+ ['交替哑铃弯举','bi',1,'','二头肌','哑铃','双手各持一只哑铃，手臂伸直、放在身体两侧，掌心朝内。一次弯一只手臂，把重量向上举，并在动作一开始就把手臂旋转 90°，到最高点再稍微向外转一点。不停顿地慢慢把手臂放下，再换另一只。',1192,'Franpol','CC-BY-SA 4.0'],
+ ['地面臂屈伸（坐姿撑起）','tr',0,'s','三头肌','徒手','起始：坐在地上，双手在身后撑住身体，手指朝前，膝盖弯曲、双脚并拢。步骤：把髋部抬离地面、手臂伸直；再屈肘，让髋部下降；再伸直手臂回到上一个位置，重复。注：髋部抬得越高，难度越大。',1000,'','CC-BY-SA 4.0'],
+ ['坐姿提踵','calf',2,'','小腿','提踵凳','坐在提踵凳上，确认脚掌有一半悬空，小腿能完全向下拉伸。把小腿向上提，尽量提高，在最高点停 1–2 秒，再慢慢下放。',590,'wger.de','CC-BY-SA 3.0'],
+ ['器械站姿提踵','calf',2,'','小腿','提踵器械','站上提踵器械，要能让小腿完全下压。站直，不要塌腰、不要弯腿。尽量向上提起，在最高点停 1–2 秒，再慢慢下放。',622,'wger.de','CC-BY-SA 3.0'],
+ ['坐姿髋内收（器械）','gl',2,'','大腿内侧','髋内收器械','背靠垫子坐在器械上，把大腿内侧抵住垫子，夹紧大腿内侧，稍停，再慢慢、受控地放回。',2699,'','CC-BY-SA 4.0'],
 ];
 
 /* 女性常練：只決定哪些動作屬於動作庫「女性常练」分類；顯示順序仍依 EXERCISE_ROWS 與類別 */
@@ -333,7 +352,9 @@ const WOMEN = [
  '胸托后束飞鸟（Y 字）','哑铃俯身侧抬肘（后束）','三头肌俯卧撑','哑铃臂屈伸','哑铃过头臂屈伸（双手握）','死虫',
  '鸟狗式','侧平板支撑','动态侧平板支撑','空心支撑','自行车卷腹','站姿侧屈卷腹',
  '儿童式','90/90 髋转换','髋屈肌拉伸','髋部交叉拉伸','蝴蝶式拉伸','青蛙式拉伸',
- '内收肌后坐拉伸'
+ '内收肌后坐拉伸','标准俯卧撑','跪姿俯卧撑','上斜俯卧撑（手扶椅子）','宽距俯卧撑','钻石俯卧撑','三点支撑俯卧撑','下斜俯卧撑（双脚垫高）',
+ '哑铃地板卧推','哑铃卧推','哑铃上斜卧推','蝴蝶机夹胸','哑铃肩推','哑铃侧平举','阿诺德推举','弹力带前平举','锤式弯举','哑铃弯举',
+ '地面臂屈伸（坐姿撑起）','坐姿髋内收（器械）','直臂下压','哑铃俯身划船','弹力带坐姿划船'
 ];
 
 /* 示範圖：wger 動作 id → 圖片（img/ 下的檔名、作者、授權） */
@@ -376,7 +397,20 @@ const IMGS = {
  '1748':[{f:'1748-1.jpg',au:'',lic:'CC-BY-SA 4.0'}],
  '1863':[{f:'1863-1.png',au:'Davidgj32',lic:'CC-BY-SA 4.0'}],
  '1867':[{f:'1867-1.png',au:'Davidgj32',lic:'CC-BY-SA 4.0'}],
- '1963':[{f:'1963-1.png',au:'',lic:'CC-BY-SA 4.0'}]
+ '1963':[{f:'1963-1.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '75':[{f:'75-1.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'75-2.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '92':[{f:'92-1.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'92-2.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '129':[{f:'129-1.jpg',au:'roneydya',lic:'CC-BY-SA 4.0'},{f:'129-2.png',au:'',lic:'CC-BY-SA 4.0'}],
+ '135':[{f:'135-1.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'135-2.jpg',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '272':[{f:'272-1.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'272-2.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'}],
+ '537':[{f:'537-1.png',au:'Everkinetic',lic:'CC-BY-SA 3.0'},{f:'537-2.jpg',au:'erikocobra',lic:'CC-BY-SA 4.0'}],
+ '622':[{f:'622-1.jpg',au:'clafal',lic:'CC-BY-SA 4.0'},{f:'622-2.jpg',au:'clafal',lic:'CC-BY-SA 4.0'}],
+ '1000':[{f:'1000-1.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '1112':[{f:'1112-1.png',au:'anon1337',lic:'CC-BY-SA 4.0'}],
+ '1192':[{f:'1192-1.jpg',au:'Franpol',lic:'CC-BY-SA 4.0'}],
+ '1725':[{f:'1725-1.jpg',au:'barry',lic:'CC-BY-SA 4.0'}],
+ '1726':[{f:'1726-1.jpg',au:'barry',lic:'CC-BY-SA 4.0'}],
+ '1968':[{f:'1968-1.png',au:'',lic:'CC-BY-SA 4.0'}]
 };
 
 /* 示範影片：動作名稱 → 影片連結。填了就優先顯示「看示范视频」；沒填就顯示 B 站搜尋入口。（目前為空） */
@@ -384,6 +418,25 @@ const VIDEOS = {};
 
 /* 訓練模板：場地 → 模板 → 動作名稱（依序取前 n 個）。
    每個名稱必須在 EXERCISE_ROWS 裡（含別名）；不適部位 t 直接取自動作資料，不再在這裡重複標註。 */
+/* 重點部位（問卷「有沒有特別想重點練的地方」）。
+   FOCUS_G：用「類別」取動作（舊的 hips/abs/arms/posture 保留，舊存檔照樣能用）。
+   FOCUS_NAMES：用「指定名稱」取動作（順序 = 優先順序，再依場地與不適部位過濾）。
+   FOCUS_LABEL：顯示名稱。分類是我按動作類型整理的，不是 wger 提供，也不是醫學判斷。 */
+const FOCUS_NAMES = {
+  chest:['标准俯卧撑','跪姿俯卧撑','上斜俯卧撑（手扶椅子）','宽距俯卧撑','钻石俯卧撑','三点支撑俯卧撑','下斜俯卧撑（双脚垫高）','哑铃地板卧推','臀桥单臂哑铃推举','哑铃卧推','哑铃上斜卧推','胸部推举机','蝴蝶机夹胸','绳索上斜单臂推胸','绳索下斜单臂推胸'],
+  shoulder:['哑铃肩推','哑铃侧平举','阿诺德推举','单臂哑铃肩推','弹力带前平举'],
+  lats:['哑铃俯身划船','哑铃单臂划船','胸托哑铃划船','弹力带坐姿划船','坐姿划船','器械坐姿划船','高位下拉','直臂下压'],
+  obliques:['侧平板支撑','动态侧平板支撑','自行车卷腹','站姿侧屈卷腹','帕洛夫推（抗旋转）'],
+  glutes:['臀桥','单腿臀桥','负重臀桥','臀推','单腿哑铃臀推','哑铃青蛙推髋','弹力带臀部后踢','哑铃驴子踢腿','跪姿后踢腿','器械臀部后踢'],
+  abduct:['蚌式开合','弹力带蚌式开合','反向蚌式开合','侧卧髋外展','仰卧髋外展','弹力带四点跪姿髋外展','器械髋外展（坐姿）','站姿抬腿（髋稳定）'],
+  inner:['坐姿髋内收（器械）','相扑深蹲','侧向分腿蹲','哥萨克深蹲']
+};
+const FOCUS_LABEL = {
+  chest:'胸部',shoulder:'肩部',lats:'背部线条',posture:'背部体态',triceps:'手臂后侧',biceps:'手臂前侧',
+  abs:'腹部',obliques:'腰线（腹斜肌）',glutes:'臀部',abduct:'臀部外侧、髋两侧',quads:'大腿前侧',hams:'大腿后侧',inner:'大腿内侧',calves:'小腿',
+  hips:'臀腿线条',arms:'手臂'
+};
+
 const LIB = {
  gym:{
   A:['高脚杯深蹲','哑铃卧推','坐姿划船','臀推','哑铃推肩','平板支撑'],
@@ -424,7 +477,7 @@ const TIMED = ['平板支撑','侧平板支撑','靠墙静蹲'];
 /* 運動基礎 → [組數, 次數, 組間休息] */
 const REPS = {new:['2','12–15','60–90 秒'],some:['3','10–15','60–90 秒'],reg:['3–4','8–12','90 秒']};
 /* 重點部位 → 動作類別 */
-const FOCUS_G = {hips:['gl'],abs:['core'],arms:['tr','bi'],posture:['rd']};
+const FOCUS_G = {hips:['gl'],abs:['core'],arms:['tr','bi'],posture:['rd'],triceps:['tr'],biceps:['bi'],quads:['sq','lg'],hams:['hg'],calves:['calf']};
 /* 動作庫：類別顯示名稱與顯示順序 */
 const GL = {sq:'深蹲类',lg:'箭步与单腿',gl:'臀部与髋',hg:'大腿后侧',hp:'推（胸）',vp:'肩部',hr:'划船（背）',vr:'下拉（背）',rd:'上背与肩后束',tr:'三头肌',bi:'二头肌',core:'核心',calf:'小腿',st:'热身与拉伸'};
 const GORDER = ['sq','lg','gl','hg','hp','vp','tr','bi','hr','vr','rd','core','calf','st'];
@@ -532,8 +585,9 @@ function buildExercises(rows){
 const EXI = buildExercises(EXERCISE_ROWS);
 const EXM = {}; EXI.forEach(function(x){ if(!EXM[x.n]) EXM[x.n]=x });            // 名稱 → 動作
 const EXG = {}; EXI.forEach(function(x){ (EXG[x.g]=EXG[x.g]||[]).push(x) });       // 類別 → 動作（保持 EXI 順序）
-const FOCUS_ROWS = {};                                                              // 重點部位 → 候選動作（保持 EXI 順序；arms 的 tr/bi 交錯順序與舊版相同）
+const FOCUS_ROWS = {};                                                              // 重點部位 → 候選動作（依類別的保持 EXI 順序；arms 的 tr/bi 交錯順序與舊版相同）
 Object.keys(FOCUS_G).forEach(function(k){ FOCUS_ROWS[k]=EXI.filter(function(x){ return FOCUS_G[k].indexOf(x.g)>=0 }) });
+Object.keys(FOCUS_NAMES).forEach(function(k){ FOCUS_ROWS[k]=FOCUS_NAMES[k].map(function(n){ return EXM[n] }) });   // 依指定名稱（順序 = 優先順序）
 
 // 這個人能做的動作名稱（依 rows 順序、去重）：器材等級在場地範圍內，且不碰她勾選的不適部位
 function usableNames(rows,A){
@@ -569,7 +623,7 @@ function calc(A){
 /* ---------- 訓練 ---------- */
 // 第 i 天的重點加練：最多 2 個，輪流取她選的部位，避開當天已有的動作
 function focusList(A,i,dayEx){
-  const areas=(A.focus||[]).filter(function(x){ return FOCUS_G[x] });
+  const areas=(A.focus||[]).filter(function(x){ return FOCUS_ROWS[x] });
   if(!areas.length) return [];
   const out=[];
   for(let k=0;k<2;k++){
@@ -812,9 +866,10 @@ function workoutCard(A){
   h += '<div class="day"><h4><span>热身</span>每次训练前 5 分钟</h4><ol>'+['肩部绕环','手臂绕环'].map(function(n){ return stItem(n) }).join('')+'</ol></div>';
   h += '<div class="day"><h4><span>拉伸</span>训练后 5–8 分钟</h4><ol>'+['儿童式','站姿小腿拉伸','三头肌拉伸'].map(function(n){ return stItem(n) }).join('')+'</ol></div>';
   h += '<div class="day"><h4><span>进阶</span>怎么加重量</h4><ul class="t"><li>热身 5–8 分钟：关节活动加上第一个动作的空杆或轻重量。</li><li>某个动作连续两次、每组都做到次数上限，下次就加一点重量（哑铃加 1–2 kg，或换更强的弹力带）。</li><li>徒手动作做不到加重时，改成放慢下放速度（3 秒）或增加每组次数。</li></ul></div>';
-  const wantF=(A.focus||[]).filter(function(x){ return FOCUS_G[x] });
-  if(wantF.length && W.every(function(d){ return d.cardio || !d.focus || !d.focus.length })){
-    h += '<div class="warn">你选了重点部位，但在你的器材和不适部位限制下，目前没有合适的重点加练动作，所以这次没有加。可以换个重点部位，或在「动作库」里挑安全的动作。</div>';
+  const wantF=(A.focus||[]).filter(function(x){ return FOCUS_ROWS[x] });
+  const noneF=wantF.filter(function(x){ return !usableNames(FOCUS_ROWS[x],A).length });
+  if(noneF.length){
+    h += '<div class="warn">你选的重点部位里，「'+noneF.map(function(x){ return FOCUS_LABEL[x] }).join('、')+'」在你的器材和不适部位限制下，目前没有合适的加练动作，所以这次没有为它加。可以换个重点部位，或在「动作库」里挑安全的动作。</div>';
   }
   if(A.injury.length && !A.injury.includes('none')){
     const names=A.injury.filter(x=>INJ_NAME[x]).map(x=>INJ_NAME[x]).join('、');
@@ -985,17 +1040,31 @@ const STEPS = [
      {id:'undecided',label:'还没想好',sub:'先按徒手排，之后随时可以重新来一份',value:'body'}],
    set:(A,v)=>{ A.place=v },
    react:(v,A,opt)=> opt && opt.id==='undecided' ? '好，先按徒手排。想换成有器材的，点最下面的「重新开始」就行。' : null },
-  // 6 重點部位
-  {k:'focus', type:'multi', rows:true,
-   q:'有没有特别想重点练的地方？（可多选）',
+  // 6 重點部位：細分成 14 個部位，分三組；最多選 3 個（每個訓練日加練 2 個動作，部位太多就不集中了）
+  {k:'focus', type:'multi', rows:true, max:3,
+   q:'有没有特别想重点练的地方？最多选 3 个，这样加练更集中。',
    opts:()=>[
-     {label:'臀腿线条',sub:'想要更翘、更紧实的臀腿',value:'hips'},
-     {label:'腰腹',sub:'想让腰腹更平坦、更有力',value:'abs'},
-     {label:'手臂',sub:'想让手臂更紧致',value:'arms'},
+     {header:'上半身'},
+     {label:'胸部',sub:'想让胸部更挺、更有线条',value:'chest'},
+     {label:'肩部',sub:'想让肩线更圆润、更有力',value:'shoulder'},
+     {label:'背部线条',sub:'想让背部更紧致、更有线条',value:'lats'},
      {label:'背部体态',sub:'想让肩背更挺，改善圆肩、驼背',value:'posture'},
+     {label:'手臂后侧',sub:'想让手臂后侧（俗称蝴蝶袖）更紧致',value:'triceps'},
+     {label:'手臂前侧',sub:'想让手臂更有线条',value:'biceps'},
+     {header:'腰腹'},
+     {label:'腹部',sub:'想让腹部更平坦、更有力',value:'abs'},
+     {label:'腰线（腹斜肌）',sub:'想练出腰线',value:'obliques'},
+     {header:'臀腿'},
+     {label:'臀部',sub:'想要更翘、更紧实的臀部',value:'glutes'},
+     {label:'臀部外侧、髋两侧',sub:'想让臀形更圆润、髋部更稳',value:'abduct'},
+     {label:'大腿前侧',value:'quads'},
+     {label:'大腿后侧',sub:'靠近臀部、坐下时贴着椅面的那一块',value:'hams'},
+     {label:'大腿内侧',sub:'这类动作是我按类型归类的',value:'inner'},
+     {label:'小腿',sub:'想让小腿线条更紧致',value:'calves'},
+     {header:' '},
      {label:'没有特别想要的',sub:'整体均衡就好',value:'none'}],
    set:(A,v)=>{ A.focus=v },
-   react:(v)=> !has2(v,'none') ? '好，每个训练日我会加一小段「重点加练」。' : null },
+   react:(v)=> !has2(v,'none') ? '好，每个训练日我会加一小段「重点加练」，重点放在：'+v.map(x=>FOCUS_LABEL[x]).join('、')+'。' : null },
   // 7 不適：用「會不會」的情境問，不問術語
   {k:'injury', type:'multi', rows:true,
    q:'平时身体有没有这些情况？有的话，我会避开容易加重的动作。（可多选）',
@@ -1109,29 +1178,33 @@ function pick(q, opts, o){
     tray.appendChild(box); toBottom();
   });
 }
-// 多选；exclusive 表示与其他互斥的选项（如“没有”）
+// 多选；exclusive 表示与其他互斥的选项（如“没有”）。选项里 {header:'上半身'} 是分组标题（不能点）；
+// o.max：最多选几个，超过时自动取消最早选的那个。
 function multi(q, opts, exclusive, o){
   o = o||{};
   return new Promise(async res=>{
     await say(q); clearTray();
-    const rows = !!o.rows || opts.some(x=>x.sub);
-    const box = el('div', rows?'opts':'chips'); const sel = new Set();
-    const btns = opts.map(x=>{
+    const real = opts.filter(x=>!x.header);
+    const rows = !!o.rows || real.some(x=>x.sub);
+    const box = el('div', rows?'opts':'chips'); const sel = new Set(); const btns = [];
+    opts.forEach(x=>{
+      if(x.header){ if(rows) box.appendChild(el('div','ogrp',x.header)); return }
       const b = el('button','chip'+(rows?' opt':''),optHtml(x,rows));
       b.onclick = ()=>{
         if(sel.has(x.value)){sel.delete(x.value)}
         else{
           if(x.value===exclusive){sel.clear()} else {sel.delete(exclusive)}
           sel.add(x.value);
+          if(o.max && x.value!==exclusive && sel.size>o.max) sel.delete(sel.values().next().value);
         }
-        btns.forEach((y,i)=>y.classList.toggle('on', sel.has(opts[i].value)));
+        btns.forEach((y,i)=>y.classList.toggle('on', sel.has(real[i].value)));
       };
-      box.appendChild(b); return b;
+      btns.push(b); box.appendChild(b);
     });
     const ok = el('button','chip go','确定');
     ok.onclick = ()=>{
       if(!sel.size){ sel.add(exclusive) }
-      const labels = opts.filter(x=>sel.has(x.value)).map(x=>x.label).join('、');
+      const labels = real.filter(x=>sel.has(x.value)).map(x=>x.label).join('、');
       add('user',labels); clearTray(); res([...sel]);
     };
     box.appendChild(ok);
@@ -1233,7 +1306,7 @@ function askStep(st,bk){
   const q = typeof st.q==='function' ? st.q(A) : st.q;
   if(st.type==='nums') return nums(q, st.fields, {back:bk});
   const opts = st.opts(A);
-  if(st.type==='multi') return multi(q, opts, 'none', {back:bk, rows:st.rows});
+  if(st.type==='multi') return multi(q, opts, 'none', {back:bk, rows:st.rows, max:st.max});
   return pick(q, opts, {back:bk, rows:st.rows});
 }
 const rowCount = () => chat.querySelectorAll('.row').length;
