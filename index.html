@@ -171,6 +171,14 @@ ul.t li{margin:4px 0}
 .dd[open] summary::after{content:"－"}
 .dd summary::-webkit-details-marker{display:none}
 
+/* 健康記錄的折線圖 */
+.chart{display:block;width:100%;height:auto;margin:4px 0}
+.ch-grid{stroke:var(--line);stroke-width:1}
+.ch-line{fill:none;stroke:var(--ink);stroke-width:2;stroke-linejoin:round}
+.ch-dot{fill:var(--ink)}.ch-dot.last{fill:var(--acc)}
+.ch-t{fill:var(--mut);font-size:11px}
+.hsrc{margin-top:8px}.hsrc a{color:var(--sub);text-decoration:underline}
+
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -556,6 +564,146 @@ const SNACKS = [
   [['希腊酸奶（脱脂、原味）',150],['蓝莓',80]],[['苹果',182],['杏仁',15]],[['香蕉',136],['杏仁',15]],
   [['无糖豆浆（低脂）',250],['草莓',100]],[['橙子',150],['核桃',15]],[['原味低脂酸奶',150],['草莓',100]],[['苹果',182],['核桃',15]]
 ];
+</script>
+<script>
+/* ==== src/js/data-health.js ==== */
+/* 健康管理庫的資料（純資料，沒有邏輯）：知識主題、不適部位的一般性資訊、資料來源。
+   規則：
+   - 每一條說法都來自下面 HEALTH_SRC 列的頁面原文（2026-11-25 取用並逐條對照），用中文改寫，不加原文沒有的內容。
+   - 來源是英國 NHS 與 WHO，不是中國的指南，也不一定完全適用於使用者所在地區；頁面上會明說。
+   - 不寫藥名與劑量，不做診斷。要提到「尽快就医」「立即急救」時，只說行動，不寫英國的電話號碼。
+   - 唯一不是原文的句子，會在句尾標「（本页建议）」。 */
+
+const HEALTH_SRC = {
+  nhsPA:{n:'NHS：19–64 岁成年人的运动指南',u:'https://www.nhs.uk/live-well/exercise/exercise-guidelines/physical-activity-guidelines-for-adults-aged-19-to-64/',d:'页面审阅于 2024-05-22'},
+  who:{n:'WHO：Physical activity（运动事实清单）',u:'https://www.who.int/news-room/fact-sheets/detail/physical-activity',d:'页面更新于 2026-11-04'},
+  nhsBen:{n:'NHS：运动的好处（Benefits of exercise）',u:'https://www.nhs.uk/live-well/exercise/exercise-health-benefits/',d:'页面审阅于 2024-08-15'},
+  nhsSleep:{n:'NHS Every Mind Matters：How to fall asleep faster and sleep better',u:'https://www.nhs.uk/every-mind-matters/mental-wellbeing-tips/how-to-fall-asleep-faster-and-sleep-better/',d:'页面没有标注审阅日期，取用于 2026-11-25'},
+  nhsLose:{n:'NHS Better Health：How to lose weight',u:'https://www.nhs.uk/better-health/lose-weight/',d:'页面没有标注审阅日期，取用于 2026-11-25'},
+  nhsWater:{n:'NHS：Water, drinks and hydration',u:'https://www.nhs.uk/live-well/eat-well/food-guidelines-and-food-labels/water-drinks-nutrition/',d:'页面审阅于 2023-05-17'},
+  nhsPeriod:{n:'NHS：Period pain（经期疼痛）',u:'https://www.nhs.uk/conditions/period-pain/',d:'页面审阅于 2026-03-18'},
+  nhsPreg:{n:'NHS：Exercise in pregnancy（孕期运动）',u:'https://www.nhs.uk/pregnancy/keeping-well/exercise/',d:'页面审阅于 2026-09-24'},
+  nhsBack:{n:'NHS：Back pain（背痛）',u:'https://www.nhs.uk/conditions/back-pain/',d:'页面审阅于 2026-03-05'},
+  nhsKnee:{n:'NHS：Knee pain（膝盖痛）',u:'https://www.nhs.uk/conditions/knee-pain/',d:'页面审阅于 2023-12-21'},
+  nhsShoulder:{n:'NHS：Shoulder pain（肩痛）',u:'https://www.nhs.uk/conditions/shoulder-pain/',d:'页面审阅于 2023-05-22'},
+  nhsNeck:{n:'NHS：Neck pain（颈痛）',u:'https://www.nhs.uk/conditions/neck-pain/',d:'页面审阅于 2023-04-27（原定 2026-04-27 复审，取用时尚未更新）'}
+};
+
+const HEALTH_NOTE = '这些资料来自英国 NHS 和 WHO，只是一般性信息，不是诊断，也不一定完全适用于你所在的地区。身体有不舒服，请以医生的意见为准。';
+
+// 知识主题：title 标题；pts 要点（每条一句）；src 来源（HEALTH_SRC 的键）
+const HEALTH_TOPICS = [
+  {id:'activity',title:'一周运动量',src:['nhsPA','who'],pts:[
+    '成年人每周至少做 150 分钟中等强度的运动，或 75 分钟高强度的运动。',
+    '每周至少有 2 天做力量训练，要练到腿、髋、背、腹、胸、肩、手臂这些主要肌群。',
+    '运动最好平均分在每周 4–5 天，或者每天都动一点。',
+    '怎么判断强度：中等强度是还能说话、但唱不出歌；高强度是喘得只能说几个字。',
+    '力量训练要练到「需要停一下才能做下一次」，才有效果。',
+    '如果你有一段时间没运动，或者有健康问题，开始前先问医生。',
+    'WHO 强调：做多少都比不做好，所有的活动都算数。']},
+  {id:'sitting',title:'久坐',src:['nhsPA','nhsBen','who'],pts:[
+    '要减少坐着、躺着的时间；坐很久的时候，中间用一点活动打断。',
+    '即使达到了每周的运动目标，如果其余时间都坐着或躺着，仍然有健康风险。',
+    '研究显示，不少成年人每天坐超过 7 小时。',
+    'WHO：各个年龄段都应该限制久坐的时间。']},
+  {id:'sleep',title:'睡眠',src:['nhsSleep','nhsLose'],pts:[
+    '作息规律：每天差不多时间睡、差不多时间起，休息日也尽量一样。',
+    '睡前 1 小时，尽量不用手机、平板和电脑。',
+    '睡前别吃太多；咖啡因会让人更清醒；酒精和尼古丁在睡前 1–2 小时尽量避免。',
+    '卧室尽量安静、黑暗、凉爽。',
+    '躺了大约 20 分钟还睡不着，就起来做点放松的事，困了再回床上。',
+    '运动有助于睡眠；如果睡前运动会影响你的睡眠，就改到白天早一些。',
+    '睡不够可能让人更容易选高热量的食物，也更没力气运动或做饭。']},
+  {id:'water',title:'喝水',src:['nhsWater'],pts:[
+    '大多数人喝到尿液是清澈的淡黄色，就够了。',
+    '英国膳食指南的参考是每天 6–8 杯液体，这只是参考；怀孕或哺乳、天气炎热、长时间运动、生病时可能需要更多。',
+    '水、低脂奶、低糖饮料（包括茶和咖啡）都算进每天的液体里。',
+    '果汁和奶昔糖多，每天最多喝一小杯（150 毫升），最好随餐喝。',
+    '运动出汗后要多补充，水是最好的选择。',
+    '咖啡因要适量；怀孕时每天不要超过 200 毫克。']},
+  {id:'weight',title:'体重怎么看',src:['nhsLose'],pts:[
+    '吃、动、睡、心情都会影响体重的变化，进展慢不代表你做错了。',
+    '多运动更有助于「把体重保持住」；哪怕一次只动 10 分钟，也有好处。',
+    'BMI 可以当作起点，最好和「腰围÷身高」一起看；BMI 低于 35 时，可以用腰高比来看腹部脂肪是不是偏多。',
+    '本页的「健康记录」会算出你的腰围÷身高，只供参考，我不做判断。']},
+  {id:'period',title:'经期不适',src:['nhsPeriod'],pts:[
+    '经期前后肚子痛、痉挛很常见，通常最多持续 3 天左右。',
+    '可以试：洗温水澡或淋浴、用暖水袋隔着毛巾热敷肚子、按摩肚子和背部、做轻柔的运动（瑜伽、游泳、散步、骑车）。',
+    '少喝酒、不吸烟，也可能有帮助。',
+    '这些情况要去看医生：经期越来越痛、经量变多或不规律；痛得影响日常；性交、排尿或排便时痛；两次月经之间出血；肚子胀；食欲下降；没刻意减重却变瘦。',
+    '如果痛得很厉害、比平时更严重，而且缓解方法没用，要尽快就医。',
+    '不舒服的时候，把训练强度降低、改成散步或拉伸，是合理的做法（本页建议）。']},
+  {id:'pregnancy',title:'孕期与产后',src:['nhsPreg','nhsPA'],pts:[
+    'NHS：孕期运动对妈妈和宝宝是安全的；开始任何新运动都要温和，通常可以继续做原本就在做的运动，但有些事要避免。',
+    '建议和一般成人相同：每周 150 分钟中等强度，包括力量训练；做不到就做你能做的。',
+    '新手可以从每天 10 分钟开始，慢慢往上加。',
+    '不建议在孕期开始新的高强度运动，例如跑步。',
+    '孕晚期，避免平躺超过几分钟，会头晕，对宝宝也不好。',
+    '避免有摔倒或撞到肚子风险的运动（例如曲棍球、橄榄球、山地车）；不要空腹运动，可能晕倒；不要潜水。',
+    '觉得不舒服、太热或不适就停下来；有已知的健康问题，先问助产士。',
+    '产后：NHS 的运动指南说，产后 6–8 周检查之后，如果觉得可以，才可以做更强的运动；孕前不运动的人，不建议做高强度运动。',
+    '你在本页勾选怀孕或哺乳期时，我只给维持体重的参考，不做热量缺口；开始训练前请先问医生（本页做法）。']}
+];
+
+// 不适部位：dyn 对应动作库里的不适标记（k 膝盖、b 腰背、s 肩颈）；各栏都是 NHS 页面的一般性信息
+const DISCOMFORT = {
+  b:{name:'腰背',src:['nhsBack'],
+    common:[
+      '背痛很常见，尤其是下背。通常几周内会好转，但有时会持续更久或反复。',
+      '常见原因是肌肉拉伤；也不一定找得出原因，常常会自己好。']
+    ,self:[
+      '保持活动，尽量继续日常生活；不要长时间躺在床上。',
+      '可以用冰袋或暖水袋隔着毛巾敷；疼痛明显时，可以请药剂师或医生建议合适的缓解方式。',
+      '可以做一些针对背痛的练习和拉伸；走路、游泳、瑜伽、普拉提也可能有帮助。但如果疼痛加重，就停下来，去看医生。']
+    ,see:[
+      '在家处理了几周还没好转；痛得影响日常活动；你很担心或应付不来。',
+      '没刻意减重却变瘦；背上有肿块或肿胀，或背的形状变了。',
+      '休息后没好转，或晚上更痛；打喷嚏、咳嗽或排便时更痛。',
+      '痛在上背部（两肩之间），而不是下背。']
+    ,soon:[
+      '觉得发热、发冷、发抖，或整个人不舒服。',
+      '很严重的疼痛，突然开始，或快速加重。']
+    ,urgent:[
+      '背痛，并且双腿疼痛、刺痛、无力或麻木。',
+      '生殖器或肛门周围失去知觉。',
+      '大小便出现变化，例如排尿困难，或控制不住。',
+      '胸痛；或者是在严重事故之后开始的。']},
+  k:{name:'膝盖',src:['nhsKnee'],
+    common:[
+      '膝盖痛常常可以在家处理，几天内应该开始好转。',
+      'NHS 提醒：不要自己诊断，担心就去看医生。']
+    ,self:[
+      '尽量少给膝盖承重，例如避免久站。',
+      '用冰袋隔着毛巾敷膝盖，每次最多 20 分钟，每 2–3 小时一次；疼痛明显时，可以请药剂师或医生建议合适的缓解方式。']
+    ,see:[
+      '膝盖痛几周内没有好转。']
+    ,soon:[
+      '膝盖很痛；不能动膝盖，或不能承重。',
+      '膝盖严重肿胀或变形。',
+      '膝盖卡住、打软，或疼痛地弹响（不痛的弹响是正常的）。',
+      '发高烧或觉得发热、发冷，而且膝盖周围红、热，这可能是感染的迹象。']
+    ,urgent:[]},
+  s:{name:'肩颈',src:['nhsShoulder','nhsNeck'],
+    common:[
+      '肩痛通常自己能慢慢缓解，一般要坚持处理 2 周才开始减轻；恢复可能需要 6 个月甚至更久。',
+      '颈痛大多只持续几周。常见原因：睡觉时颈部卡在不舒服的位置、久坐姿势不良、神经受压、受伤。']
+    ,self:[
+      '肩：保持活动，轻轻活动肩膀；站直，肩膀放下并轻轻后收；做肩部练习 6–8 周，防止再痛。',
+      '肩不要：完全不用肩膀（这会让它更不容易好）；做会让它更痛的事；自己编强度大的训练，或用重的健身器械；坐着时驼背、耸肩或头向前探。',
+      '颈：保持颈部活动，除非医生要求，不要戴颈托；用低而稳的枕头；可以热敷或冷敷；做颈部灵活性练习。',
+      '预防颈痛：睡觉时让头和身体同高；床垫偏硬；坐直、肩膀轻轻后收；不要长时间保持同一个姿势；不要趴着睡；躺在床上不要扭颈。']
+    ,see:[
+      '肩痛加重，或 2 周后没有好转；手臂或肩膀很难活动。',
+      '颈痛或僵硬几周后没有消失；缓解方法没用；你很担心。',
+      '有手发麻、手臂发冷等其他症状，这可能是更严重的问题。']
+    ,soon:[
+      '突然的、或很严重的肩痛；不能动手臂。',
+      '手臂或肩膀变形，或严重肿胀。',
+      '刺痛、发麻一直不消失；手臂或肩膀完全没有感觉。',
+      '手臂或肩膀摸起来发热或冰冷。',
+      '疼痛是在受伤或跌倒之后开始的；双肩都很痛；觉得发热或不舒服。']
+    ,urgent:[]}
+};
 </script>
 <script>
 /* ==== src/js/logic.js ==== */
@@ -959,6 +1107,187 @@ function planText(A,C){
 }
 </script>
 <script>
+/* ==== src/js/health.js ==== */
+/* 健康管理庫的邏輯與卡片 HTML（純函式，不碰 DOM；瀏覽器與 Node 測試共用）。資料在 data-health.js。
+   安全前提：拼進 HTML 的只有本頁常數（data-health.js）、動作庫名稱，以及經 validLog() 檢查過的「數字」與日期（固定格式）；
+   沒有任何使用者自由輸入的文字。
+   語法層級與其他檔案相同（const/let、箭頭函式），不用 ?. ?? 與 ES module，以相容老版微信。 */
+
+/* ---------- 健康記錄：資料格式與檢查 ---------- */
+const LOG_KEY = 'fit_log';
+const LOG_MAX = 366;                                   // 最多留一年
+// 欄位：w 體重 kg、wa 腰圍 cm、s 睡眠 小時、h 飲水 杯；值可以是 null（當天沒記）
+const LOG_RANGE = {w:[20,250], wa:[30,200], s:[0,24], h:[0,40]};
+const LOG_FIELDS = ['w','wa','s','h'];
+const LOG_LABEL = {w:'体重',wa:'腰围',s:'睡眠',h:'饮水'};
+const LOG_UNIT = {w:'kg',wa:'cm',s:'小时',h:'杯'};
+
+function dateKey(dt){                                  // 本機日期 YYYY-MM-DD（中國使用者用手機本地時間）
+  const p=n=>(n<10?'0':'')+n;
+  return dt.getFullYear()+'-'+p(dt.getMonth()+1)+'-'+p(dt.getDate());
+}
+function isDateKey(s){
+  if(typeof s!=='string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const y=+s.slice(0,4), m=+s.slice(5,7), d=+s.slice(8,10), t=new Date(y,m-1,d);
+  return y>=2000 && y<=2100 && t.getFullYear()===y && t.getMonth()===m-1 && t.getDate()===d;
+}
+function validLogEntry(e){
+  if(!e || typeof e!=='object' || Array.isArray(e) || !isDateKey(e.d)) return false;
+  let any=false;
+  for(const k in e){ if(k!=='d' && LOG_FIELDS.indexOf(k)<0) return false }
+  for(const k of LOG_FIELDS){
+    const v=e[k];
+    if(v===null || v===undefined) continue;
+    if(typeof v!=='number' || !isFinite(v) || v<LOG_RANGE[k][0] || v>LOG_RANGE[k][1]) return false;
+    any=true;
+  }
+  return any;
+}
+// 整份記錄：陣列、日期遞增且不重複、每筆合法、不超過上限；不合法就整份當作沒有（避免注入與程式出錯）
+function validLog(L){
+  if(!Array.isArray(L) || L.length>LOG_MAX) return false;
+  for(let i=0;i<L.length;i++){
+    if(!validLogEntry(L[i])) return false;
+    if(i>0 && !(L[i-1].d < L[i].d)) return false;
+  }
+  return true;
+}
+// 新增或更新某一天（同一天只留一筆，後記的覆蓋先記的有填的欄位）；回傳新陣列，不改原陣列
+function logUpsert(L,e){
+  const out=L.map(function(x){ return Object.assign({},x) });
+  const i=out.findIndex(function(x){ return x.d===e.d });
+  const clean={d:e.d}; LOG_FIELDS.forEach(function(k){ if(typeof e[k]==='number') clean[k]=e[k] });
+  if(i>=0){ LOG_FIELDS.forEach(function(k){ if(typeof clean[k]==='number') out[i][k]=clean[k] }) }
+  else { out.push(clean); out.sort(function(a,b){ return a.d<b.d?-1:a.d>b.d?1:0 }) }
+  return out.slice(Math.max(0,out.length-LOG_MAX));
+}
+// 某個欄位有值的點 [{d,v}]
+function logSeries(L,k){
+  return L.filter(function(x){ return typeof x[k]==='number' }).map(function(x){ return {d:x.d,v:x[k]} });
+}
+// 最近 n 筆有值的平均
+function logAvgLast(L,k,n){
+  const s=logSeries(L,k).slice(-n); if(!s.length) return null;
+  return s.reduce(function(a,x){ return a+x.v },0)/s.length;
+}
+function logStats(L,height){
+  const st={};
+  LOG_FIELDS.forEach(function(k){
+    const s=logSeries(L,k);
+    st[k]={n:s.length, first:s.length?s[0]:null, last:s.length?s[s.length-1]:null, delta:s.length>1?s[s.length-1].v-s[0].v:null};
+  });
+  st.s.avg7=logAvgLast(L,'s',7); st.h.avg7=logAvgLast(L,'h',7);
+  st.whr = (st.wa.last && height>0) ? st.wa.last.v/height : null;      // 腰圍 ÷ 身高（同單位 cm）；只顯示，不判斷
+  return st;
+}
+
+/* ---------- 折線圖（純 SVG，只用數字） ---------- */
+function fmtN(v,dec){ return (Math.round(v*Math.pow(10,dec))/Math.pow(10,dec)).toFixed(dec) }
+function mmdd(d){ return d.slice(5,7)+'-'+d.slice(8,10) }
+// points：[{d,v}]；回傳 SVG 字串。少於 2 點時只畫一個點。
+function chartSvg(points,dec){
+  const W=300,H=110,PL=8,PR=8,PT=14,PB=22;
+  if(!points.length) return '';
+  const vs=points.map(function(p){ return p.v });
+  let lo=Math.min.apply(null,vs), hi=Math.max.apply(null,vs);
+  if(hi-lo<1e-9){ lo-=1; hi+=1 }
+  const pad=(hi-lo)*0.15; lo-=pad; hi+=pad;
+  const x=i=> points.length===1 ? W/2 : PL+(W-PL-PR)*i/(points.length-1);
+  const y=v=> PT+(H-PT-PB)*(1-(v-lo)/(hi-lo));
+  const pts=points.map(function(p,i){ return fmtN(x(i),1)+','+fmtN(y(p.v),1) }).join(' ');
+  const last=points[points.length-1], first=points[0];
+  let s='<svg class="chart" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="趋势图">';
+  s+='<line class="ch-grid" x1="'+PL+'" y1="'+(H-PB)+'" x2="'+(W-PR)+'" y2="'+(H-PB)+'"/>';
+  if(points.length>1) s+='<polyline class="ch-line" points="'+pts+'"/>';
+  points.forEach(function(p,i){ s+='<circle class="ch-dot'+(i===points.length-1?' last':'')+'" cx="'+fmtN(x(i),1)+'" cy="'+fmtN(y(p.v),1)+'" r="'+(i===points.length-1?4:2.5)+'"/>' });
+  s+='<text class="ch-t" x="'+PL+'" y="'+(H-6)+'">'+mmdd(first.d)+'</text>';
+  s+='<text class="ch-t" x="'+(W-PR)+'" y="'+(H-6)+'" text-anchor="end">'+mmdd(last.d)+'</text>';
+  s+='<text class="ch-t" x="'+(points.length===1?W/2:W-PR)+'" y="'+Math.max(10,y(last.v)-8)+'" text-anchor="'+(points.length===1?'middle':'end')+'">'+fmtN(last.v,dec)+'</text>';
+  return s+'</svg>';
+}
+
+/* ---------- 卡片 HTML ---------- */
+function srcHtml(keys){
+  return '<div class="muted hsrc">来源：'+keys.map(function(k){
+    const s=HEALTH_SRC[k];
+    return '<a href="'+s.u+'" target="_blank" rel="noopener">'+s.n+'</a>（'+s.d+'）';
+  }).join('；')+'</div>';
+}
+const ul = (a)=> a.length ? '<ul class="t">'+a.map(function(x){ return '<li>'+x+'</li>' }).join('')+'</ul>' : '';
+
+// 健康知识库
+function healthKnowledgeCard(){
+  let h='<div class="card"><h3>健康知识库（'+HEALTH_TOPICS.length+' 个主题）</h3><div class="muted">'+HEALTH_NOTE+'点主题展开。</div>';
+  HEALTH_TOPICS.forEach(function(t,i){
+    h+='<details class="dd"'+(i===0?' open':'')+'><summary>'+t.title+'</summary>'+ul(t.pts)+srcHtml(t.src)+'</details>';
+  });
+  return h+'</div>';
+}
+
+// 不适与运动调整库：A.injury 里勾选的部位排在最前面，并标「你选了」
+const DIS_ORDER = ['k','b','s'];
+function avoidedBy(code){ return EXI.filter(function(x){ return x.t===code && x.how }) }          // 本页计划会避开的动作（有做法说明的）
+// 還可以練的動作：不帶這個不適標記、有做法說明的，按類別列出（每類最多 3 個）。
+// 例如膝盖：深蹲、箭步類全都帶膝盖標記，所以會看到臀桥、早安式、俯卧撑這些其他類別的動作。
+function safeAlternatives(code){
+  const out=[];
+  GORDER.forEach(function(g){
+    if(g==='st') return;
+    const names=EXI.filter(function(x){ return x.g===g && x.t!==code && x.how }).slice(0,3).map(function(x){ return x.n });
+    if(names.length) out.push({g:GL[g],names:names});
+  });
+  return out;
+}
+function discomfortCard(A){
+  const picked=(A && A.injury) || [];
+  const order=DIS_ORDER.slice().sort(function(a,b){ return (picked.indexOf(b)>=0)-(picked.indexOf(a)>=0) });
+  let h='<div class="card"><h3>不适与运动调整</h3><div class="muted">先说本页怎么处理，再列 NHS 的一般性提醒。'+HEALTH_NOTE+'</div>';
+  order.forEach(function(code,i){
+    const d=DISCOMFORT[code], av=avoidedBy(code), alt=safeAlternatives(code), mine=picked.indexOf(code)>=0;
+    h+='<details class="dd"'+(i===0&&mine?' open':'')+'><summary>'+d.name+(mine?' <span class="rec">你选了</span>':'')+'</summary>';
+    h+='<div class="day"><h4><span>本页</span>怎么处理</h4><ul class="t"><li>你在问卷里勾选「'+d.name+'」不适时，训练计划和换动作都会避开 '+av.length+' 个带这个标记的动作。这个标记是我按动作类型自己标的，不是医学判断。</li>'+
+      '<li>如果某个动作做的时候疼（不是肌肉酸），马上停下来。</li></ul>';
+    h+='<details class="xd"><summary>会避开的动作（'+av.length+' 个）</summary><div class="xb">'+av.map(function(x){ return x.n }).join('、')+'</div></details>';
+    h+='<details class="xd"><summary>还可以练的动作（不带这个标记，每类最多列 3 个）</summary><div class="xb">'+alt.map(function(a){ return '<b>'+a.g+'</b>：'+a.names.join('、') }).join('<br>')+'</div></details></div>';
+    h+='<div class="day"><h4><span>常见</span>情况</h4>'+ul(d.common)+'</div>';
+    h+='<div class="day"><h4><span>自己</span>可以做</h4>'+ul(d.self)+'</div>';
+    h+='<div class="day"><h4><span>去看</span>医生</h4>'+ul(d.see)+'</div>';
+    h+='<div class="day"><h4><span>尽快</span>就医</h4>'+ul(d.soon)+'</div>';
+    if(d.urgent.length) h+='<div class="day"><h4><span>立即</span>急救</h4>'+ul(d.urgent)+'</div>';
+    h+=srcHtml(d.src)+'</details>';
+  });
+  return h+'</div>';
+}
+
+// 健康记录与趋势
+function logCard(L,height){
+  let h='<div class="card"><h3>健康记录与趋势</h3>';
+  if(!L.length){
+    return h+'<div class="muted">还没有记录。点「记今天」，可以记体重、腰围、睡眠和饮水，每项都可以不填。记录只存在这台手机里，不会上传；换手机或清除浏览器数据会丢，需要的话先点「复制记录」存到备忘录。</div></div>';
+  }
+  const st=logStats(L,height);
+  h+='<div class="muted">共 '+L.length+' 天的记录，最近一次是 '+L[L.length-1].d+'。只存在这台手机里，不会上传。</div>';
+  [['w',1],['wa',1]].forEach(function(p){
+    const k=p[0], s=logSeries(L,k); if(!s.length) return;
+    const dl=st[k].delta;
+    h+='<div class="day"><h4><span>'+LOG_LABEL[k]+'</span>'+fmtN(st[k].last.v,p[1])+' '+LOG_UNIT[k]+'</h4>'+
+      (dl===null?'<div class="muted">只有 1 次记录，再记几次就能看到变化。</div>':'<div class="muted">比第一次记录（'+st[k].first.d+'）'+(dl>0?'多 ':dl<0?'少 ':'没变，')+(dl===0?'':fmtN(Math.abs(dl),1)+' '+LOG_UNIT[k])+'</div>')+
+      chartSvg(s,p[1])+'</div>';
+  });
+  if(st.whr!==null) h+='<div class="rows"><div><span>腰围 ÷ 身高</span><b>'+fmtN(st.whr,2)+'</b></div></div><div class="muted">只是把你最近一次的腰围除以身高，供你自己对照变化；怎么解读请问医生（NHS 建议 BMI 要和腰高比一起看）。</div>';
+  [['s',1],['h',1]].forEach(function(p){
+    const k=p[0]; if(!st[k].n) return;
+    h+='<div class="rows"><div><span>'+LOG_LABEL[k]+'（最近 '+Math.min(7,st[k].n)+' 次平均）</span><b>'+fmtN(st[k].avg7,1)+' '+LOG_UNIT[k]+'</b></div></div>';
+  });
+  return h+'</div>';
+}
+// 複製用的純文字（備份到備忘錄）
+function logText(L){
+  const rows=L.map(function(x){ return [x.d].concat(LOG_FIELDS.map(function(k){ return typeof x[k]==='number'?x[k]:'' })).join('\t') });
+  return ['日期\t体重kg\t腰围cm\t睡眠小时\t饮水杯'].concat(rows).join('\n');
+}
+</script>
+<script>
 /* ==== src/js/questions.js ==== */
 /* 問卷：問什麼、有哪些選項、答完怎麼回應、答案怎麼寫進 A。純資料與純函式，不碰 DOM（Node 測試可直接驗證所有題目）。
    app.js 負責把這些步驟畫成聊天、處理「改上一題」。
@@ -1130,6 +1459,9 @@ let A = {};
 let runId = 0;
 
 /* ---------- localStorage：一律包 try/catch（部分環境會丟 SecurityError） ---------- */
+// 健康記錄（fit_log）：整份通過 validLog 才用，否則當作沒有
+function loadLog(){ try{ const L=JSON.parse(localStorage.getItem(LOG_KEY)||'null'); return validLog(L) ? L : [] }catch(e){ return [] } }
+function saveLog(L){ try{ localStorage.setItem(LOG_KEY,JSON.stringify(L)) }catch(e){} }
 function loadSaved(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)||'null') }catch(e){ return null } }
 function saveA(){ try{ localStorage.setItem(STORE_KEY,JSON.stringify(A)) }catch(e){} }
 function clearSaved(){ try{ localStorage.removeItem(STORE_KEY) }catch(e){} }
@@ -1280,6 +1612,57 @@ function copyText(t){
 }
 
 /* ================= 对话流程 ================= */
+/* ---------- 健康管理：知识库、记录与趋势、不适与运动调整 ---------- */
+async function healthFlow(my){
+  while(true){
+    const x = await pick('想看哪一部分？',[
+      {label:'健康知识',sub:'运动量、久坐、睡眠、喝水、体重、经期、孕期与产后',value:'k'},
+      {label:'健康记录与趋势',sub:'记体重、腰围、睡眠、饮水，看变化曲线',value:'l'},
+      {label:'不适与运动调整',sub:'膝盖、腰背、肩颈不舒服时怎么办',value:'d'},
+      {label:'返回',value:'b',cls:'ghost'}]);
+    if(my!==runId) return;
+    if(x==='k') await say(healthKnowledgeCard(),true);
+    else if(x==='d') await say(discomfortCard(A),true);
+    else if(x==='l') await logFlow(my);
+    else return;
+  }
+}
+async function logFlow(my){
+  while(true){
+    const L = loadLog();
+    await say(logCard(L,A.height),true);
+    const opts = [{label:'记今天',value:'r'}];
+    if(L.length){ opts.push({label:'复制记录',value:'c',cls:'ghost'}); opts.push({label:'清除记录',value:'x',cls:'ghost'}) }
+    opts.push({label:'返回',value:'b',cls:'ghost'});
+    const x = await pick('',opts);
+    if(my!==runId) return;
+    if(x==='r') await recordToday();
+    else if(x==='c'){ await copyText(logText(L)); await say('已复制。可以粘贴到备忘录里备份。') }
+    else if(x==='x'){
+      const y = await pick('清除后无法恢复，确定吗？',[{label:'确定清除',value:'y'},{label:'先不清除',value:'n',cls:'ghost'}]);
+      if(y==='y'){ saveLog([]); await say('已清除。') }
+    }
+    else return;
+  }
+}
+async function recordToday(){
+  const L = loadLog();
+  const lastOf = k => { const s=logSeries(L,k); return s.length ? s[s.length-1].v : null };
+  const clamp = (v,lo,hi) => Math.min(hi,Math.max(lo,v));
+  const fields = [
+    {k:'w',label:'体重',unit:'kg',min:30,max:150,def:clamp(lastOf('w')||A.weight||55,30,150),s1:0.5,s2:5,optional:true},
+    {k:'wa',label:'腰围',unit:'cm',min:50,max:140,def:clamp(lastOf('wa')||A.waist||70,50,140),s1:1,s2:5,optional:true},
+    {k:'s',label:'睡眠',unit:'小时',min:3,max:14,def:clamp(lastOf('s')||7,3,14),s1:0.5,s2:1,optional:true},
+    {k:'h',label:'饮水',unit:'杯',min:0,max:20,def:clamp(lastOf('h')||6,0,20),s1:1,s2:2,optional:true}];
+  const mark = rowCount();
+  const v = await nums('记一下今天的情况。点数字填上，没记的项目保持「未填」就行。',fields,{back:true});
+  if(v===BACK){ dropRowsFrom(mark); return }
+  const e = {d:dateKey(new Date())}; LOG_FIELDS.forEach(k=>{ if(typeof v[k]==='number') e[k]=v[k] });
+  if(LOG_FIELDS.every(k=>typeof e[k]!=='number')){ await say('这次什么都没填，所以没有记录。'); return }
+  saveLog(logUpsert(L,e));
+  await say('已记下 '+e.d+' 的情况。');
+}
+
 async function showResult(my){
   setProg(PROG_TOTAL);
   const C = calc(A);
@@ -1287,12 +1670,13 @@ async function showResult(my){
   while(true){
     if(my!==runId) return;
     const c = await pick('想先看哪一部分？',[
-      {label:'训练计划',value:'w'},{label:'饮食计划',value:'m'},{label:'动作库',value:'x'},{label:'食物库',value:'f'},{label:'小贴士',value:'t'},
+      {label:'训练计划',value:'w'},{label:'饮食计划',value:'m'},{label:'动作库',value:'x'},{label:'食物库',value:'f'},{label:'健康管理',value:'h'},{label:'小贴士',value:'t'},
       {label:'复制训练摘要',value:'c',cls:'ghost'},{label:'重新开始',value:'r',cls:'ghost'}]);
     if(my!==runId) return;
     if(c==='w') await say(workoutCard(A),true);
     else if(c==='m') await say(menuCard(A,C),true);
     else if(c==='f') await say(foodLibCard(A),true);
+    else if(c==='h') await healthFlow(my);
     else if(c==='x'){
       const sc = await pick('看哪一类动作？',[{label:'徒手动作',value:0},{label:'哑铃/弹力带',value:1},{label:'健身房器械',value:2},{label:'热身与拉伸',value:'st'},{label:'女性常练',value:'w'}]);
       await say(exLibCard(sc,A),true);
