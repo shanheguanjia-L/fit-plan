@@ -28,3 +28,10 @@
 ## 免责声明
 
 热量和营养目标由公式估算，不是医学诊断或治疗建议。怀孕、哺乳、慢性病、服药或未满 18 岁，请先咨询医生。
+
+## 开发
+
+- 源码在 `src/`（样式 `src/style.css`，脚本 `src/js/`），`dev.html` 直接载入源码，用于本地预览（需要用 http 打开，例如 `python3 -m http.server`）。
+- 上线用的 `index.html` 是打包产物，不要直接改：改完 `src/` 后执行 `node tools/build.js` 重新生成。
+- 测试：`node tests/run.js`（单元测试与静态检查）；`node tests/golden.js --text --legacy`（与重构前原版逐字比对不该变的部分）。
+- 详细说明见 `REFACTOR.md`。

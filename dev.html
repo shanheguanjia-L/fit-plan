@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<!-- 開發用頁面：直接載入 src/ 底下的原始檔（一般 <script src> 依序載入）。
+     正式上線的是根目錄 index.html，由 node tools/build.js 把這些檔案內嵌成單一檔案產生。 -->
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1">
+<title>我的专属健身计划</title>
+<!-- 錯誤提示條的樣式內嵌在這裡：就算 style.css 載不到，提示條也看得見 -->
+<style>#err{display:none;background:#b00020;color:#fff;padding:8px 12px;font-size:13px;word-break:break-all}</style>
+<script>
+/* 必須最先執行：錯誤提示條（#err）與載入失敗偵測。
+   - 執行期錯誤：顯示「页面出错：訊息 (檔名:行號)」。
+   - 開發版 dev.html 用一般 <script src> 依序載入（不用 module）：js 檔載入失敗 → 記進 FIT_LOAD_FAILED，
+     app.js 看到就不啟動，並顯示「页面文件加载失败」；style.css 載入失敗 → 只顯示提示，問答照常可用。
+   - 正式版 index.html 已把所有檔案內嵌，不會有載入失敗，這段只負責顯示執行期錯誤。 */
+var FIT_LOAD_FAILED = [], fitErrMsg = '';
+function fitShowErr(msg){
+  fitErrMsg = msg;
+  var b=document.getElementById('err'); if(!b) return;   // #err 還沒解析到：等 DOMContentLoaded 再顯示
+  b.style.display='block'; b.textContent=msg;
+}
+document.addEventListener('DOMContentLoaded',function(){ if(fitErrMsg) fitShowErr(fitErrMsg) });
+function fitLoadFail(node){
+  var u=(node.getAttribute('src')||node.getAttribute('href')||'').split('?')[0];
+  if(node.tagName==='SCRIPT') FIT_LOAD_FAILED.push(u);
+  fitShowErr('页面文件加载失败（'+u+'），请检查网络后刷新页面。');
+}
+window.addEventListener('error',function(e){
+  if(FIT_LOAD_FAILED.length) return;  // 已有載入失敗提示時，後續連帶的錯誤不覆蓋它
+  var f=(e.filename||'').split('?')[0].split('/').pop();
+  fitShowErr('页面出错：'+(e.message||'未知')+' ('+(f?f+':':'')+(e.lineno||'?')+')');
+});
+</script>
+<link rel="stylesheet" href="src/style.css" onerror="fitLoadFail(this)">
+</head>
+<body>
+<div id="app">
+  <header><div><b>健身小助手</b><small>回答几个问题，生成你的专属计划</small></div><div id="prog"><i></i></div></header>
+  <div id="err"></div>
+  <div id="chat"><div id="tray"></div></div>
+  <noscript><p style="padding:16px">需要开启 JavaScript 才能使用。</p></noscript>
+</div>
+<script src="src/js/data-exercises.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/data-foods.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/data-health.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/logic.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/render.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/health.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/questions.js" onerror="fitLoadFail(this)"></script>
+<script src="src/js/app.js" onerror="fitLoadFail(this)"></script>
+</body>
+</html>
