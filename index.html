@@ -57,6 +57,9 @@ header b{display:block;font-size:16px}header small{color:var(--sub);font-size:12
 .exb{flex:none}
 .mini{border:1px solid var(--acc);color:var(--acc);background:#fff;border-radius:12px;padding:2px 10px;font-size:12px;font-family:inherit}
 .xd{margin:3px 0 4px}.xd summary{color:var(--acc);font-size:13px;cursor:pointer}
+.imgs{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 4px}
+.imgs img{max-width:100%;max-height:230px;height:auto;border-radius:6px;background:#fff}
+.vlink{margin:6px 0 2px}.vlink a{display:inline-block;border:1px solid var(--acc);color:var(--acc);background:#fff;border-radius:14px;padding:4px 12px;font-size:13px;text-decoration:none}
 .xb{background:var(--acc2);border-radius:8px;padding:8px 10px;margin-top:4px;font-size:14px}
 ul.t{margin:6px 0;padding-left:20px}ul.t li{margin:4px 0}
 .dd{border-top:1px solid var(--line);padding:8px 0}
@@ -547,6 +550,21 @@ function alts(cur,dayEx,A){
     if(c!==cur && dayEx.indexOf(c)<0 && !(m.id && EXM[c].id===m.id)) out.push(c) }
   return out;
 }
+const IMGS = {"81": [{"f": "81-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "203": [{"f": "203-1.jpg", "au": "philip", "lic": "CC-BY-SA 4.0"}, {"f": "203-2.jpg", "au": "philip", "lic": "CC-BY-SA 4.0"}], "265": [{"f": "265-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "348": [{"f": "348-1.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "348-2.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "364": [{"f": "364-1.png", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "371": [{"f": "371-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "458": [{"f": "458-1.png", "au": "utkb", "lic": "CC-BY-SA 4.0"}, {"f": "458-2.png", "au": "utkb", "lic": "CC-BY-SA 4.0"}], "567": [{"f": "567-1.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "567-2.jpg", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "805": [{"f": "805-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "977": [{"f": "977-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "981": [{"f": "981-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "984": [{"f": "984-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "990": [{"f": "990-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1002": [{"f": "1002-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1084": [{"f": "1084-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1091": [{"f": "1091-1.jpg", "au": "clafal", "lic": "CC-BY-SA 4.0"}], "1117": [{"f": "1117-1.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}, {"f": "1117-2.jpg", "au": "Franpol", "lic": "CC-BY-SA 4.0"}], "1194": [{"f": "1194-1.png", "au": "", "lic": "CC-BY-SA 4.0"}, {"f": "1194-2.png", "au": "prevail90", "lic": "CC-BY-SA 4.0"}], "1230": [{"f": "1230-1.jpg", "au": "anonymous", "lic": "CC-BY-SA 4.0"}], "1239": [{"f": "1239-1.jpg", "au": "erikocobra", "lic": "CC-BY-SA 4.0"}], "1283": [{"f": "1283-1.jpg", "au": "carlos3c", "lic": "CC-BY-SA 4.0"}], "1336": [{"f": "1336-1.png", "au": "", "lic": "CC-BY-SA 4.0"}], "1392": [{"f": "1392-1.png", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}, {"f": "1392-2.png", "au": "Everkinetic", "lic": "CC-BY-SA 3.0"}], "1551": [{"f": "1551-1.jpg", "au": "Settebello", "lic": "CC-BY-SA 4.0"}], "1572": [{"f": "1572-1.jpg", "au": "Settebello", "lic": "CC-BY-SA 4.0"}], "1613": [{"f": "1613-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1616": [{"f": "1616-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1639": [{"f": "1639-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1642": [{"f": "1642-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1651": [{"f": "1651-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1652": [{"f": "1652-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1706": [{"f": "1706-1.jpg", "au": "AlucardEvil40", "lic": "CC-BY-SA 4.0"}], "1732": [{"f": "1732-1.jpg", "au": "54str", "lic": "CC-BY-SA 4.0"}], "1748": [{"f": "1748-1.jpg", "au": "", "lic": "CC-BY-SA 4.0"}], "1963": [{"f": "1963-1.png", "au": "", "lic": "CC-BY-SA 4.0"}]};
+// 动作示范视频：名称 → 视频链接。填了就优先显示「看示范视频」；没填就显示 B 站搜索入口。
+const VIDEOS = {};
+function mediaBlock(m){
+  let h='';
+  const L=IMGS[m.id]||[];
+  if(L.length){
+    h+='<div class="imgs">'+L.map(function(x){ return '<img loading="lazy" src="img/'+x.f+'" alt="'+m.n+' 示范图">' }).join('')+'</div>';
+    const au=[]; L.forEach(function(x){ const t=(x.au||'wger 社区')+'（'+x.lic+'）'; if(au.indexOf(t)<0) au.push(t) });
+    h+='<div class="muted">示范图作者：'+au.join('、')+'，来自 wger.de。</div>';
+  }
+  const v=VIDEOS[m.n];
+  h+='<div class="vlink"><a href="'+(v||('https://search.bilibili.com/all?keyword='+encodeURIComponent(m.n+' 教学')))+'" target="_blank" rel="noopener">'+(v?'▶ 看示范视频':'▶ 找教学视频（B 站搜索）')+'</a></div>';
+  return h;
+}
 function srcLine(m){
   if(!m.id) return '';
   return '<div class="muted">来源：wger 动作 #'+m.id+(m.au?'，作者 '+m.au:'')+'，'+m.lic+'。中文要点为改写。</div>';
@@ -556,13 +574,13 @@ function exItem(nm,i,j,A,dayEx){
   let h = '<li><div class="exr"><span>'+nm+' <i>'+exLine(nm,A)+'</i></span><span class="exb">'+
     (alts(nm,dayEx,A).length?'<button class="mini swp" data-k="'+i+'-'+j+'">换一个</button>':'')+'</span></div>';
   if(m && m.how){
-    h += '<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+srcLine(m)+'</div></details>';
+    h += '<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details>';
   }
   return h+'</li>';
 }
 function stItem(nm){
   const m=EXM[nm]; if(!m) return '';
-  return '<li>'+nm+'<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+srcLine(m)+'</div></details></li>';
+  return '<li>'+nm+'<details class="xd"><summary>怎么做</summary><div class="xb"><div class="muted">锻炼部位：'+m.mus+' · 器材：'+m.eq+'</div>'+m.how+mediaBlock(m)+srcLine(m)+'</div></details></li>';
 }
 function workoutCard(A){
   const W = workout(A); const [sets,reps,rest] = REPS[A.exp];
@@ -618,7 +636,7 @@ function exLibCard(scope,A){
     h += '<div class="day"><h4><span>'+GL[g]+'</span></h4>';
     L.forEach(function(m){
       const w = (m.t && A.injury.indexOf(m.t)>=0) ? '<div class="warn" style="margin:4px 0">你选了「'+warnMap[m.t]+'」不适，这个动作对该部位压力较大，不建议做。</div>' : '';
-      h += '<details class="xd"><summary style="font-size:15px;color:var(--ink)">'+m.n+' <span class="muted">'+m.mus+'</span></summary><div class="xb"><div class="muted">器材：'+m.eq+'</div>'+m.how+w+srcLine(m)+'</div></details>';
+      h += '<details class="xd"><summary style="font-size:15px;color:var(--ink)">'+m.n+' <span class="muted">'+m.mus+'</span></summary><div class="xb"><div class="muted">器材：'+m.eq+'</div>'+m.how+w+mediaBlock(m)+srcLine(m)+'</div></details>';
     });
     h += '</div>';
   });
