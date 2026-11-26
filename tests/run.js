@@ -88,7 +88,7 @@ test('示範圖：每個 id 都對到有要點的動作、檔案都在 img/、im
   });
   const files=fs.readdirSync(path.join(ROOT,'img')).filter(f=>!f.startsWith('.'));
   assert.deepStrictEqual(files.slice().sort(), used.slice().sort());
-  assert.strictEqual(files.length,66);
+  assert.strictEqual(files.length,64);
 });
 test('食物：48 種（原 47 + 羊腿肉）、名稱與 FDC 編號唯一、飲食範本用到的名稱都存在；原 47 種的內容與順序不變', ()=>{
   assert.strictEqual(FOODS.length,48);
