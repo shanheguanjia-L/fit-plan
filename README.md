@@ -2,6 +2,8 @@
 
 回答几个问题，现场算出每周训练安排和 7 天饮食示例。所有计算都在手机浏览器里完成，不上传数据。
 
+在线使用：https://shanheguanjia-l.github.io/fit-plan/
+
 ## 动作资料来源与授权
 
 动作的名称、锻炼部位、器材和「怎么做」要点，来自开源项目 [wger](https://wger.de)（https://github.com/wger-project/wger）的动作数据库。
