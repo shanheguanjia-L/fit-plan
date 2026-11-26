@@ -1,2 +1,5 @@
 .DS_Store
 node_modules/
+
+# 作品帳號管理迴圈補上的基本項目
+.env
